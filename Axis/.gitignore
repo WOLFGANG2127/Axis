@@ -1,0 +1,5 @@
+venv/ 
+.venv/ 
+*.pyd 
+.env 
+Axis/.env 

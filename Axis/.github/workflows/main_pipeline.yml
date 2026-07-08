@@ -1,0 +1,67 @@
+name: Axis Main Pipeline
+
+on:
+  schedule:
+    - cron: '*/5 3-10 * * *'
+  workflow_dispatch:
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        symbol: [NIFTY, BANKNIFTY]
+    concurrency:
+      group: axis-${{ matrix.symbol }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: Market Open Pre-Check
+        id: market_check
+        env:
+          AXIS_MARKET_HOLIDAYS: ${{ secrets.AXIS_MARKET_HOLIDAYS }}
+        run: |
+          python -c "import sys; from src.scheduling.calendar_gate import is_market_open; sys.exit(0 if is_market_open() else 1)" || echo "skip=true" >> $GITHUB_OUTPUT
+
+      - name: Install Dependencies
+        if: steps.market_check.outputs.skip != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run Pipeline
+        if: steps.market_check.outputs.skip != 'true'
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          DHAN_TOTP_SECRET: ${{ secrets.DHAN_TOTP_SECRET }}
+          DHAN_PIN: ${{ secrets.DHAN_PIN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DB_PROVIDER: ${{ secrets.DB_PROVIDER }}
+          VECTOR_DB_PROVIDER: ${{ secrets.VECTOR_DB_PROVIDER }}
+          GRAPH_DATABASE_PROVIDER: ${{ secrets.GRAPH_DATABASE_PROVIDER }}
+          CACHE_BACKEND: ${{ secrets.CACHE_BACKEND }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          python main.py --symbol ${{ matrix.symbol }}

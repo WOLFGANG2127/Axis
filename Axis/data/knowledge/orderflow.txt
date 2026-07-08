@@ -1,0 +1,1 @@
+Orderflow trading involves reading the tape and order book to see the aggressive buyers and sellers at current prices.
