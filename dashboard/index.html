@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIS Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --panel-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --accent-color: #3b82f6;
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+    }
+    h1, h2, h3 { margin-top: 0; font-weight: 500; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+    }
+    .status-container {
+      display: flex;
+      gap: 16px;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel-bg);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-size: 0.9em;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+    }
+    .dot.healthy { background-color: var(--green); }
+    .dot.dead { background-color: var(--red); }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      height: fit-content;
+    }
+    .signals-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .signal-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border-color);
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .signal-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .verdict-PROCEED { color: var(--green); font-weight: 600; }
+    .verdict-BLOCK { color: var(--red); font-weight: 600; }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9em;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    th {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .pnl-positive { color: var(--green); }
+    .pnl-negative { color: var(--red); }
+    
+    @media (max-width: 1024px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    
+    /* Config Modal */
+    #config-modal {
+      display: flex;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: var(--panel-bg);
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      width: 400px;
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0 20px;
+      box-sizing: border-box;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: white;
+      border-radius: 6px;
+    }
+    .modal-content button {
+      width: 100%;
+      padding: 10px;
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="config-modal">
+    <div class="modal-content">
+      <h2>Database Configuration</h2>
+      <p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 20px;">Required for read-only browser access to Supabase.</p>
+      <label>Supabase URL</label>
+      <input type="text" id="input-url" placeholder="https://xyzcompany.supabase.co">
+      <label>Supabase ANON Key</label>
+      <input type="password" id="input-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      <button onclick="saveConfig()">Save & Connect</button>
+    </div>
+  </div>
+
+  <div class="header">
+    <h1>AXIS Dashboard</h1>
+    <div class="status-container">
+      <div class="status-badge">
+        <div class="dot" id="dot-nifty"></div>
+        NIFTY <span id="time-nifty" style="color: var(--text-muted)">--</span>
+      </div>
+      <div class="status-badge">
+        <div class="dot" id="dot-banknifty"></div>
+        BANKNIFTY <span id="time-banknifty" style="color: var(--text-muted)">--</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Live Signals Feed</h2>
+      <div class="signals-feed" id="signals-container">
+        <!-- populated by js -->
+      </div>
+    </div>
+    
+    <div class="panel" style="grid-row: span 2;">
+      <h2>Recent Paper Trades (Last 20)</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Time (Entry - Exit)</th>
+              <th>Symbol & Strategy</th>
+              <th>Status</th>
+              <th>Net PnL</th>
+              <th>Exit Reason</th>
+            </tr>
+          </thead>
+          <tbody id="trades-tbody">
+            <!-- populated by js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Virtual Portfolios Allocation</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Strategy</th>
+              <th>Capital</th>
+              <th>Total PnL</th>
+              <th>Win Rate</th>
+            </tr>
+          </thead>
+          <tbody id="portfolios-tbody">
+            <!-- populated by js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

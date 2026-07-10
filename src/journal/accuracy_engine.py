@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+logger = logging.getLogger("axis.accuracy")
 
 from src.config.constants import ACCURACY_MIN_SAMPLE
 from src.database.supabase import get_supabase_client
@@ -89,7 +92,10 @@ def sample_count(strategy_name: str, symbol: str, *, db: Any | None = None, is_b
 def run_lasso_reweighting(min_sample_count: int = 50, is_backtest: bool = False) -> dict | None:
     """Run LassoCV on pooled trades to update scoring weights."""
     import numpy as np
-    from datetime import date
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
+    IST = ZoneInfo("Asia/Kolkata")
+    
     try:
         from sklearn.linear_model import LassoCV
     except ImportError:
@@ -98,9 +104,6 @@ def run_lasso_reweighting(min_sample_count: int = 50, is_backtest: bool = False)
     db = _database(None)
     
     # Query paper_trades and join market_context_snapshots via signals
-    # We will fetch all trades, then for each trade find the signal, then find the snapshot
-    # This might be tricky if the join string is wrong, so we fetch trades, signals and snapshots separately.
-    # But since it's a small dataset (~50-100 rows), this is fast.
     trades_res = db.table(get_table_name("paper_trades", is_backtest)).select("*").eq("status", "CLOSED").execute()
     trades = trades_res.data or []
     
@@ -116,9 +119,15 @@ def run_lasso_reweighting(min_sample_count: int = 50, is_backtest: bool = False)
 
     features = []
     targets = []
+    sample_weights = []
+    vix_values = []
+    trade_ids_for_tagging = []
     
     nifty_count = 0
     banknifty_count = 0
+
+    LAMBDA = np.log(2) / 75.0
+    now_ist_date = datetime.now(IST).date()
 
     for t in trades:
         sig = signals.get(t.get("signal_id"))
@@ -139,18 +148,48 @@ def run_lasso_reweighting(min_sample_count: int = 50, is_backtest: bool = False)
 
         rmult = float(t.get("r_multiple_achieved", 0))
         
+        # 1. Regime-Shift Decay: Calculate days_since_trade and apply exponential decay
+        exit_time_str = t.get("exit_time")
+        if exit_time_str:
+            exit_dt = datetime.fromisoformat(str(exit_time_str).replace("Z", "+00:00")).astimezone(IST).date()
+            days_since = max(0, (now_ist_date - exit_dt).days)
+        else:
+            days_since = 0
+            
+        weight = np.exp(-LAMBDA * days_since)
+        
         features.append([gex, vix, fii, order_flow, pcr, pcr_div])
         targets.append(rmult)
+        sample_weights.append(weight)
+        vix_values.append(vix)
+        trade_ids_for_tagging.append(t.get("id"))
 
     if len(features) < min_sample_count:
         return None
+        
+    # 2. VIX-Percentile Bucketing (Regime Tags)
+    p33 = np.percentile(vix_values, 33)
+    p66 = np.percentile(vix_values, 66)
+    
+    for i, t_id in enumerate(trade_ids_for_tagging):
+        v = vix_values[i]
+        regime = "Low" if v < p33 else ("Medium" if v <= p66 else "High")
+        
+        # Tag the trade in trade_outcomes
+        to_res = db.table("trade_outcomes").select("signal_metadata").eq("paper_trade_id", t_id).execute()
+        if to_res.data:
+            meta = to_res.data[0].get("signal_metadata") or {}
+            if meta.get("vix_regime") != regime:
+                meta["vix_regime"] = regime
+                db.table("trade_outcomes").update({"signal_metadata": meta}).eq("paper_trade_id", t_id).execute()
 
-    # Fit Lasso
+    # Fit Lasso with Decayed Sample Weights
     X = np.array(features)
     y = np.array(targets)
+    sw = np.array(sample_weights)
     
     model = LassoCV(cv=5, random_state=42)
-    model.fit(X, y)
+    model.fit(X, y, sample_weight=sw)
     
     coefs = model.coef_
     w_gex, w_vix, w_fii, w_order_flow, w_pcr, w_pcr_divergence = [float(c) for c in coefs]
@@ -171,28 +210,58 @@ def run_lasso_reweighting(min_sample_count: int = 50, is_backtest: bool = False)
     }).execute()
     
     # Aggregation Rule
-    # "This deliberately overrides pure Lasso sparsity — the floor exists because a regression this small ... can spuriously zero out a genuinely-useful feature by noise alone..."
-    def _floor(val: float) -> float:
-        return max(0.10, max(0.0, val))
+    # Ensure raw weights are non-negative before applying the layer floor
+    def _non_negative(val: float) -> float:
+        return max(0.0, val)
 
-    fw_gex = _floor(w_gex)
-    fw_vix = _floor(w_vix)
-    fw_fii = _floor(w_fii)
-    fw_order_flow = _floor(w_order_flow)
-    fw_pcr = _floor(w_pcr)
-    fw_pcr_div = _floor(w_pcr_divergence)
+    nw_gex = _non_negative(w_gex)
+    nw_vix = _non_negative(w_vix)
+    nw_fii = _non_negative(w_fii)
+    nw_order_flow = _non_negative(w_order_flow)
+    nw_pcr = _non_negative(w_pcr)
+    nw_pcr_div = _non_negative(w_pcr_divergence)
 
     validation_flag = 0  # Still one-session validated
     
-    raw_layer_a = fw_gex + fw_vix + fw_pcr + (fw_pcr_div * validation_flag)
-    raw_layer_b = fw_fii
-    raw_layer_c = fw_order_flow
+    raw_layer_a = nw_gex + nw_vix + nw_pcr + (nw_pcr_div * validation_flag)
+    raw_layer_b = nw_fii
+    raw_layer_c = nw_order_flow
     
-    total = raw_layer_a + raw_layer_b + raw_layer_c
+    raw_layers = [raw_layer_a, raw_layer_b, raw_layer_c]
     
-    layer_a_weight = raw_layer_a / total
-    layer_b_weight = raw_layer_b / total
-    layer_c_weight = raw_layer_c / total
+    # 1. Apply the hard 0.10 floor to all three layers
+    floored_weights = [max(0.10, w) for w in raw_layers]
+    
+    # 2. Calculate the total sum of these floored weights
+    total_sum = sum(floored_weights)
+    
+    # 3. Calculate the overflow amount
+    overflow = total_sum - 1.0
+    
+    final_weights = []
+    
+    if overflow > 0:
+        # 4. Calculate the sum of only the layers that are strictly greater than 0.10
+        reclaimable_sum = sum(w for w in floored_weights if w > 0.10)
+        
+        # 5. Proportions are deducted only from those layers above the floor
+        for w in floored_weights:
+            if w > 0.10:
+                final_weights.append(w - (overflow * (w / reclaimable_sum)))
+            else:
+                final_weights.append(0.10)
+    elif overflow < 0:
+        # If total_sum < 1.0, scale up proportionally to exactly 1.0 (will never violate 0.10 floor)
+        final_weights = [w / total_sum for w in floored_weights]
+    else:
+        final_weights = list(floored_weights)
+        
+    # 6. Add an explicit assertion at the end verifying that sum == 1.0 and no weight < 0.10
+    import math
+    assert math.isclose(sum(final_weights), 1.0, rel_tol=1e-5), f"Total weight must be 1.0, got {sum(final_weights)}"
+    assert all(w >= 0.09999 for w in final_weights), f"A weight dropped below the 0.10 floor: {final_weights}"
+
+    layer_a_weight, layer_b_weight, layer_c_weight = final_weights
     
     # Insert new scoring_config
     # Set active=false for current

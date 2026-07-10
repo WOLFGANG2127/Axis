@@ -50,3 +50,53 @@ def send_telegram_alert(
             return True
         except Exception:
             return False
+
+def send_behavioral_rating_prompt(
+    bot_token: str,
+    chat_id: str,
+    trade_id: Any,
+    *,
+    timeout: float = 10.0,
+) -> bool:
+    """Send an outbound Telegram message asking the user to rate their Session Quality/Behavior."""
+    import requests
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {"text": "5 - Perfect Execution", "callback_data": f"rate_{trade_id}_5"},
+                {"text": "4 - Good", "callback_data": f"rate_{trade_id}_4"}
+            ],
+            [
+                {"text": "3 - Average", "callback_data": f"rate_{trade_id}_3"},
+                {"text": "2 - Poor", "callback_data": f"rate_{trade_id}_2"}
+            ],
+            [
+                {"text": "1 - Tilt / Reckless", "callback_data": f"rate_{trade_id}_1"}
+            ]
+        ]
+    }
+    
+    text = (
+        f"🧠 *Trade {trade_id} Closed*\n\n"
+        "Please rate your behavioral execution for this trade. "
+        "Your honest input trains the regime-shift decay model."
+    )
+    
+    try:
+        response = requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "Markdown",
+                "reply_markup": reply_markup,
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return True
+    except Exception:
+        return False

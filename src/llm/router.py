@@ -49,10 +49,40 @@ def _content(response: Any) -> str:
     return str(content)
 
 
-async def _acompletion(model: str, api_key: str, messages: list[dict[str, str]]) -> Any:
-    from litellm import acompletion
+class BudgetExhaustedError(RuntimeError):
+    """Raised when the daily LLM budget firewall is breached."""
 
-    return await acompletion(
+
+async def _acompletion(model: str, api_key: str, messages: list[dict[str, str]]) -> Any:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from litellm import acompletion, completion_cost
+    from src.database.supabase import get_supabase_client
+    from src.config.settings import settings
+    
+    IST = ZoneInfo("Asia/Kolkata")
+    today = datetime.now(IST).date().isoformat()
+    db = get_supabase_client()
+    
+    # Phase A: Pre-Flight Budget Check
+    res = db.table("llm_cost_guardrail").select("cumulative_spend_usd, hard_cap_usd").eq("trading_date", today).execute()
+    cap = 2.0
+    if res.data:
+        row = res.data[0]
+        spend = float(row.get("cumulative_spend_usd", 0.0))
+        cap = float(row.get("hard_cap_usd", 2.0))
+        if spend >= cap:
+            msg = f"AXIS ALERT: Daily LLM budget of ${cap:.2f} exhausted (Spend: ${spend:.2f}). Pipeline locked into safe mode."
+            try:
+                from src.delivery.telegram_formatter import send_telegram_alert
+                send_telegram_alert(settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID, msg)
+            except Exception:
+                import logging
+                logging.getLogger("axis.llm").exception("Failed to send budget exhausted alert")
+            raise BudgetExhaustedError(msg)
+
+    # Phase B: Execute the actual LLM call
+    response = await acompletion(
         model=model,
         messages=messages,
         api_key=api_key,
@@ -60,6 +90,32 @@ async def _acompletion(model: str, api_key: str, messages: list[dict[str, str]])
         num_retries=0,
         stream=False,
     )
+    
+    # Phase C: Post-Flight Accounting
+    try:
+        cost = float(completion_cost(completion_response=response) or 0.0)
+    except Exception:
+        cost = 0.0
+        
+    if cost > 0:
+        try:
+            rpc_res = db.rpc("increment_llm_spend", {
+                "p_trading_date": today,
+                "p_cost_usd": cost,
+                "p_hard_cap_usd": cap
+            }).execute()
+            
+            if rpc_res.data:
+                new_total = float(rpc_res.data)
+                if new_total >= (cap * 0.90):
+                    msg = f"AXIS WARNING: Daily LLM budget nearly depleted! Spend: ${new_total:.2f} / ${cap:.2f}"
+                    from src.delivery.telegram_formatter import send_telegram_alert
+                    send_telegram_alert(settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID, msg)
+        except Exception:
+            import logging
+            logging.getLogger("axis.llm").exception("Failed to update or alert LLM spend")
+            
+    return response
 
 
 def _provider_payload(raw: str, provider: str, role: str) -> dict[str, Any]:

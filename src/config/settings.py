@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     SUPABASE_URL: HttpUrl
     SUPABASE_ANON_KEY: str = Field(min_length=1)
     SUPABASE_SERVICE_ROLE_KEY: str = Field(min_length=1)
+    
+    GOVERNANCE_DAILY_LOSS_MODE: str = "SHADOW"
 
     @field_validator("TELEGRAM_CHAT_ID", mode="before")
     @classmethod

@@ -275,9 +275,19 @@ def transaction_cost(
         raise ValueError("sell_premium_value cannot be negative")
     if brokerage < 0 or exchange_charges < 0 or gst_rate < 0:
         raise ValueError("transaction-cost inputs cannot be negative")
-    stt = 0.000625 * sell_premium_value
-    gst = gst_rate * brokerage
-    return stt + brokerage + exchange_charges + gst
+    # Since signature cannot change, we use sell_premium_value for both legs
+    total_sell_premium = sell_premium_value
+    total_buy_premium = sell_premium_value
+    total_turnover = total_buy_premium + total_sell_premium
+
+    calculated_exchange_charges = 0.0003503 * total_turnover
+    sebi_turnover_fee = 0.000001 * total_turnover
+    
+    gst = gst_rate * (brokerage + calculated_exchange_charges + sebi_turnover_fee)
+    stamp_duty = 0.00003 * total_buy_premium
+    stt = 0.0015 * total_sell_premium
+
+    return stt + brokerage + calculated_exchange_charges + sebi_turnover_fee + gst + stamp_duty
 
 
 def expected_value(
@@ -290,7 +300,12 @@ def expected_value(
         raise ValueError("win_prob must be between 0 and 1")
     if avg_gain < 0 or avg_loss < 0 or est_transaction_cost < 0:
         raise ValueError("gain, loss, and transaction cost cannot be negative")
-    return win_prob * avg_gain - (1.0 - win_prob) * avg_loss - est_transaction_cost
+        
+    # [PLACEHOLDER] - Empirical slippage data required to replace this 2.5 point hardcoded penalty.
+    # NOTE: Since symbol/quantity is not parameterized here, we assume a conservative 1 lot of NIFTY (65)
+    slippage_rupees = 2.5 * 65
+    
+    return (win_prob * avg_gain) - ((1.0 - win_prob) * avg_loss) - est_transaction_cost - slippage_rupees
 
 
 def kelly_fraction(win_prob: float, avg_gain: float, avg_loss: float) -> float:

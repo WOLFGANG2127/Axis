@@ -23,8 +23,10 @@ def get_banknifty_shadow_status(virtual_portfolio_id: int, is_backtest: bool = F
     if not vp_res.data:
         raise ValueError(f"Virtual portfolio {virtual_portfolio_id} not found")
     vp = vp_res.data[0]
-
-    fill_realism_audit_passed = bool(vp.get("fill_realism_audit_passed", False))
+    # SAFETY: NULL or missing fill_realism_audit_passed MUST default to False (BLOCK).
+    # Never allow a corrupted or absent value to slip through as truthy.
+    raw_fill_realism = vp.get("fill_realism_audit_passed")
+    fill_realism_audit_passed = raw_fill_realism is True  # Only explicit True passes
     
     trades_res = client.table(get_table_name("paper_trades", is_backtest)).select("entry_time,exit_time,pnl_rupees").eq("virtual_portfolio_id", virtual_portfolio_id).execute()
     trades = trades_res.data or []

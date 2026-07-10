@@ -61,10 +61,19 @@ def fetch_option_chain(
         from src.data.dhan_client import get_expiry_list, get_option_chain
 
         expiries = get_expiry_list(normalized)
-        if not expiries["data"]:
-            raise RuntimeError("no active option expiry returned by NSE or Dhan")
+        # Circuit-breaker safe: Dhan may return None if tripped
+        if expiries is None or not expiries.get("data"):
+            return _envelope(
+                {"source": "offline", "records": None},
+                "stale",
+            )
         expiry = expiries["data"][0]
         chain = get_option_chain(normalized, expiry)
+        if chain is None:
+            return _envelope(
+                {"source": "dhan-fallback-offline", "records": None},
+                "stale",
+            )
         return _envelope(
             {"source": "dhan-fallback", "expiry": expiry, **chain["data"]},
             chain["trust_status"],

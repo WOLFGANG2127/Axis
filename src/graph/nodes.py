@@ -190,6 +190,33 @@ async def verifier_node(state: AxisState) -> dict:
         return {"verifier_verdict": _synthetic_block("ANALYST_OUTPUT_EMPTY_OR_ERRORED")}
     if state.node_error and state.node_error.get("node") == "analyst":
         return {"verifier_verdict": _synthetic_block("ANALYST_OUTPUT_EMPTY_OR_ERRORED")}
+        
+    from src.risk.risk_manager import check_daily_drawdown, validate_asymmetry, apply_trade_tag
+    
+    # 1. Drawdown Check
+    if not check_daily_drawdown():
+        try:
+            from src.delivery.telegram_formatter import send_telegram_alert
+            from src.config.settings import settings
+            msg = "Trade blocked: Daily max loss limit reached"
+            send_telegram_alert(settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID, msg)
+        except Exception:
+            pass
+        return {"verifier_verdict": _synthetic_block("MAX_LOSS_LIMIT_REACHED")}
+        
+    # 2. Asymmetry Check
+    strategy = state.active_strategy or {}
+    entry = float(strategy.get("entry", 0.0))
+    sl = float(strategy.get("stop_loss", 0.0))
+    # We use target_1 as the primary payoff threshold
+    tp = float(strategy.get("target_1", 0.0))
+    
+    if entry > 0 and sl > 0 and tp > 0:
+        if not validate_asymmetry(entry, sl, tp):
+            # 3. Tagging / Logging
+            # Since the trade is blocked pre-execution, we use a synthetic block tag
+            # instead of a DB trade_id tag.
+            return {"verifier_verdict": _synthetic_block("SUBOPTIMAL_RR")}
     try:
         if SERVICES.verifier:
             verdict = await _call(SERVICES.verifier, state)
@@ -201,7 +228,120 @@ async def verifier_node(state: AxisState) -> dict:
                 verdict = await call_llm_router("verifier", state)
         if not verdict:
             verdict = _synthetic_block("VERIFIER_UNAVAILABLE")
-        return {"verifier_verdict": verdict}
+            
+        if isinstance(verdict, Mapping):
+            decision = verdict.get("decision", verdict.get("verdict", "BLOCK"))
+        else:
+            decision = str(verdict)
+            
+        ret: dict[str, Any] = {"verifier_verdict": verdict}
+        
+        if str(decision).upper() == "PROCEED":
+            try:
+                from src.database.supabase import get_supabase_client
+                import math
+                from datetime import timedelta
+                
+                db = get_supabase_client()
+                now = datetime.now(IST)
+                sixty_mins_ago = (now - timedelta(minutes=60)).isoformat()
+                
+                my_symbol = (state.symbol or "").upper()
+                my_dir = strategy.get("direction", "").lower()
+                other_symbol = "BANKNIFTY" if my_symbol == "NIFTY" else "NIFTY"
+                
+                # 1. Query macro_regime_flags for the other symbol
+                flags_res = db.table("macro_regime_flags") \
+                    .select("*") \
+                    .eq("symbol", other_symbol) \
+                    .gte("signal_timestamp", sixty_mins_ago) \
+                    .order("signal_timestamp", desc=True) \
+                    .limit(1) \
+                    .execute()
+                    
+                if flags_res.data and my_dir:
+                    other_flag = flags_res.data[0]
+                    other_dir = other_flag.get("direction", "").lower()
+                    other_time = other_flag.get("signal_timestamp")
+                    
+                    # 2. Hedging vs. Correlation Gate
+                    if other_dir == my_dir:
+                        # Same-direction correlation: Apply risk reduction
+                        orig_lots = strategy.get("lots", 0)
+                        if orig_lots > 0:
+                            new_lots = max(1, math.floor(orig_lots / 2))
+                            # Proportionally reduce capital/risk
+                            reduction_ratio = new_lots / orig_lots
+                            
+                            strategy["lots"] = new_lots
+                            if "capital_deployed" in strategy:
+                                strategy["capital_deployed"] *= reduction_ratio
+                            if "risk_rupees" in strategy:
+                                strategy["risk_rupees"] *= reduction_ratio
+                                
+                            # 4. Inject Tag
+                            tag_time = datetime.fromisoformat(str(other_time).replace("Z", "+00:00")).astimezone(IST).strftime("%H:%M")
+                            strategy["alert_tag"] = f"⚠️ CORRELATED SIGNAL — {other_symbol} {other_dir.capitalize()} at {tag_time}"
+                            ret["active_strategy"] = strategy
+                            
+                # 5. Insert current signal's data into macro_regime_flags
+                if my_symbol and my_dir:
+                    db.table("macro_regime_flags").insert({
+                        "symbol": my_symbol,
+                        "direction": my_dir,
+                        "signal_timestamp": now.isoformat(),
+                        "session_id": "SYS" # Fallback since session_id isn't directly in AxisState
+                    }).execute()
+                    
+                # 6. Capture Signal Metadata
+                trades_res = db.table("paper_trades").select("exit_time,pnl_rupees").order("exit_time", desc=True).limit(10).execute()
+                recent_trades = trades_res.data or []
+                win_streak = 0
+                loss_streak = 0
+                for t in recent_trades:
+                    pnl = float(t.get("pnl_rupees") or 0)
+                    if pnl > 0:
+                        if loss_streak > 0: break
+                        win_streak += 1
+                    elif pnl < 0:
+                        if win_streak > 0: break
+                        loss_streak += 1
+                        
+                hours_since_last = None
+                if recent_trades and recent_trades[0].get("exit_time"):
+                    last_exit = datetime.fromisoformat(str(recent_trades[0]["exit_time"]).replace("Z", "+00:00")).astimezone(IST)
+                    hours_since_last = (now - last_exit).total_seconds() / 3600.0
+                    
+                kelly_lots = _context(state).get("kelly_recommended_lots") or strategy.get("kelly_recommended_lots")
+                actual_lots = strategy.get("lots", 0)
+                kelly_ratio = (actual_lots / float(kelly_lots)) if (kelly_lots and float(kelly_lots) > 0) else None
+                
+                strategy["signal_metadata"] = {
+                    "stage1_entry_price": strategy.get("entry"),
+                    "stage1_lots": actual_lots,
+                    "level_held_bool": _context(state).get("closed_back_in_zone"),
+                    "stage2_hypothetical_trigger_price": None, # Post-trade compute
+                    "stage2_would_have_fired_bool": None, # Post-trade compute
+                    "alert_price": strategy.get("entry"),
+                    "fii_long_short_ratio_at_signal": _context(state).get("fii_long_short_ratio"),
+                    "hours_since_last_trade_session_end": hours_since_last,
+                    "time_of_day_entered": now.isoformat(),
+                    "win_streak_count_at_entry": win_streak,
+                    "loss_streak_count_at_entry": loss_streak,
+                    "lots_taken_vs_kelly_recommended_ratio": kelly_ratio,
+                    # Outcome time fields (NULL at signal time)
+                    "actual_fill_price": None,
+                    "simulated_pyramided_pnl": None,
+                    "realized_direction_next_60min": None,
+                    "entry_minutes_since_last_loss": None
+                }
+                ret["active_strategy"] = strategy
+                
+            except Exception as e:
+                import logging
+                logging.getLogger("axis.risk").error("Cross-symbol coordination failed: %s", e)
+                
+        return ret
     except Exception as exc:
         return {
             "verifier_verdict": _synthetic_block("VERIFIER_ERROR"),

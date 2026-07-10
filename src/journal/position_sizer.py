@@ -103,6 +103,9 @@ def calculate_position(
         raise InsufficientCapitalError(
             f"risk budget {risk_budget:.2f} cannot fund one lot risking {risk_per_lot:.2f}"
         )
+        
+    # TODO (Tier 5): NIFTY's effective freeze quantity is 1,755 units (27 lots) at lot size 65. BankNifty's equivalent freeze quantity needs confirming before Tier 5 pyramid execution work begins.
+    
     return {
         "lots": lots,
         "capital_deployed": float(lots * lot_size * entry),

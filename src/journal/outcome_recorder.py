@@ -54,7 +54,7 @@ def record_outcome(paper_trade_id: Any, *, db: Any | None = None, is_backtest: b
     database = _database(db)
     trade = _one(
         database.table(get_table_name("paper_trades", is_backtest))
-        .select("id,symbol,exit_time,exit_price,pnl_rupees,pre_trade_checklist")
+        .select("*")
         .eq("id", paper_trade_id)
         .limit(2)
         .execute()
@@ -102,6 +102,181 @@ def record_outcome(paper_trade_id: Any, *, db: Any | None = None, is_backtest: b
         "post_exit_vix_classification": vix_class,
         "outcome_category": category,
     }
+    
+    # 2.4 Behavioral Auto-Tagging
+    auto_tag = None
+    checklist = trade.get("pre_trade_checklist") or {}
+    if isinstance(checklist, str):
+        import json
+        try:
+            checklist = json.loads(checklist)
+        except Exception:
+            checklist = {}
+            
+    # 1. Check OVERSIZE_CONVICTION
+    actual_lots = trade.get("lots") or trade.get("quantity") or checklist.get("lots") or 0
+    kelly_lots = checklist.get("kelly_recommended_lots") or checklist.get("recommended_lots")
+    
+    if actual_lots and kelly_lots:
+        # Boundary: > 1.25 is oversized. Exactly 1.25x is considered safe.
+        if float(actual_lots) > (float(kelly_lots) * 1.25):
+            auto_tag = "OVERSIZE_CONVICTION"
+
+    # 2. Check REVENGE_TRADE
+    entry_time_str = trade.get("entry_time")
+    if entry_time_str:
+        # Find the exit time of the last recorded losing trade BEFORE this entry
+        last_loss_res = (
+            database.table(get_table_name("paper_trades", is_backtest))
+            .select("exit_time")
+            .lt("pnl_rupees", 0)
+            .lt("exit_time", entry_time_str)
+            .order("exit_time", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if last_loss_res.data and last_loss_res.data[0].get("exit_time"):
+            last_loss_exit = datetime.fromisoformat(str(last_loss_res.data[0]["exit_time"]).replace("Z", "+00:00")).astimezone(IST)
+            entry_time = datetime.fromisoformat(str(entry_time_str).replace("Z", "+00:00")).astimezone(IST)
+            
+            diff_minutes = (entry_time - last_loss_exit).total_seconds() / 60.0
+            
+            # Boundary: < 20.0 minutes is revenge. Exactly 20.0 minutes is considered safe.
+            if diff_minutes < 20.0:
+                auto_tag = "REVENGE_TRADE" # This correctly overwrites OVERSIZE_CONVICTION if both occur
+                
+    if auto_tag:
+        row["behavioral_outcome_category"] = auto_tag
+        row["behavioral_tag_auto"] = True
+        row["behavioral_tag_source"] = "AUTO"
+    else:
+        row["behavioral_outcome_category"] = "PENDING"
+        row["behavioral_tag_auto"] = False
+        row["behavioral_tag_source"] = "PENDING"
+        
+    # 2.6 Signal Metadata Population (Outcome Time)
+    signal_metadata = checklist.get("signal_metadata", {})
+    
+    # Set fields computable at outcome time
+    signal_metadata["actual_fill_price"] = trade.get("entry_price", trade.get("exit_price"))
+    
+    # Using the local diff_minutes calculated for the REVENGE_TRADE check
+    if 'diff_minutes' in locals():
+        signal_metadata["entry_minutes_since_last_loss"] = diff_minutes
+    else:
+        signal_metadata["entry_minutes_since_last_loss"] = None
+        
+    # These explicitly require follow-up jobs/backfills
+    signal_metadata["simulated_pyramided_pnl"] = None
+    signal_metadata["realized_direction_next_60min"] = None
+    
+    row["signal_metadata"] = signal_metadata
+        
     response = database.table("trade_outcomes").insert(row).execute()
+    
+    # Outbound Behavioral Prompt (Prompt 27)
+    if not auto_tag:
+        try:
+            from src.delivery.telegram_formatter import send_behavioral_rating_prompt
+            from src.config.settings import settings
+            send_behavioral_rating_prompt(settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID, paper_trade_id)
+        except Exception as e:
+            import logging
+            logging.getLogger("axis.journal").error("Failed to send behavioral prompt: %s", e)
+    
+    # 2.3 Compute and Update Dynamic Drawdown Limit
+    _update_dynamic_drawdown_limit(database, is_backtest)
+    
     return (response.data or [row])[0]
 
+def _update_dynamic_drawdown_limit(db: Any, is_backtest: bool) -> None:
+    import numpy as np
+    
+    try:
+        table_name = get_table_name("paper_trades", is_backtest)
+        thirty_days_ago = (datetime.now(IST) - timedelta(days=30)).isoformat()
+        
+        # Query past 30 calendar days of realized daily net P&L
+        res = db.table(table_name).select("exit_time, pnl_rupees").gte("exit_time", thirty_days_ago).execute()
+        trades = res.data or []
+        
+        daily_pnl = {}
+        for t in trades:
+            if not t.get("exit_time") or t.get("pnl_rupees") is None:
+                continue
+            dt = datetime.fromisoformat(str(t["exit_time"]).replace("Z", "+00:00")).astimezone(IST)
+            date_str = dt.date().isoformat()
+            daily_pnl[date_str] = daily_pnl.get(date_str, 0.0) + float(t["pnl_rupees"])
+                
+        pnl_array = np.array(list(daily_pnl.values()))
+        
+        if len(pnl_array) < 3:
+            dynamic_limit = 5000.0
+        else:
+            sigma = np.std(pnl_array)
+            three_sigma = abs(3.0 * sigma)
+            
+            losing_days = pnl_array[pnl_array < 0]
+            if len(losing_days) < 5:
+                # Handle fallback if fewer than 5 losing days
+                dynamic_limit = 5000.0
+            else:
+                p95_loss = float(np.percentile(np.abs(losing_days), 95))
+                # Select the smaller of the two absolute values
+                dynamic_limit = min(three_sigma, p95_loss)
+                
+            dynamic_limit = max(dynamic_limit, 1000.0) # Safe minimum clamp
+            
+        today = datetime.now(IST).date().isoformat()
+        # Update max_loss_limit for today
+        existing = db.table("daily_risk_limits").select("current_drawdown").eq("trading_date", today).execute()
+        if existing.data:
+            db.table("daily_risk_limits").update({"max_loss_limit": float(dynamic_limit)}).eq("trading_date", today).execute()
+        else:
+            db.table("daily_risk_limits").insert({"trading_date": today, "max_loss_limit": float(dynamic_limit)}).execute()
+            
+    except Exception as e:
+        import logging
+        logging.getLogger("axis.journal").error("Failed to update dynamic drawdown limit: %s", e)
+
+def process_behavioral_rating(score: str, trade_id: Any = None) -> bool:
+    """
+    Process an inbound behavioral rating from the user via the webhook.
+    If trade_id is provided, verify it. Otherwise, fallback to the most recent PENDING trade.
+    Returns True if processed, False if ignored (e.g., if clicked hours late and no PENDING exists).
+    """
+    db = get_supabase_client()
+    
+    if trade_id:
+        res = db.table("trade_outcomes").select("id, behavioral_tag_source").eq("paper_trade_id", trade_id).execute()
+        if not res.data or res.data[0].get("behavioral_tag_source") != "PENDING":
+            return False
+        target_id = res.data[0]["id"]
+    else:
+        # Fallback: Find the most recent PENDING trade
+        res = db.table("trade_outcomes").select("id").eq("behavioral_tag_source", "PENDING").order("id", desc=True).limit(1).execute()
+        if not res.data:
+            return False
+        target_id = res.data[0]["id"]
+        
+    score_map = {
+        "5": "USER_PERFECT",
+        "4": "USER_GOOD",
+        "3": "USER_AVERAGE",
+        "2": "USER_POOR",
+        "1": "USER_TILT"
+    }
+    
+    clean_score = str(score).strip()
+    category = score_map.get(clean_score, f"USER_SCORE_{clean_score}")
+    
+    try:
+        db.table("trade_outcomes").update({
+            "behavioral_outcome_category": category,
+            "behavioral_tag_source": "USER"
+        }).eq("id", target_id).execute()
+        return True
+    except Exception as e:
+        import logging
+        logging.getLogger("axis.journal").error("Failed to update behavioral rating: %s", e)
+        return False

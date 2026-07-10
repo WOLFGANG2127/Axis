@@ -12,7 +12,7 @@ jobs:
       matrix:
         symbol: [NIFTY, BANKNIFTY]
     concurrency:
-      group: axis-${{ matrix.symbol }}
+      group: "${{ github.workflow }}-${{ matrix.symbol }}"
       cancel-in-progress: false
 
     steps:

@@ -28,6 +28,29 @@ def build_alert(state: AxisState) -> str:
     verifier = state.verifier_verdict or {}
     decision = verifier.get("decision") if isinstance(verifier, Mapping) else verifier
 
+    # Drawdown Recovery Text (Prompt 25)
+    dd_pct = context.get("portfolio_drawdown_pct") or strategy.get("drawdown_pct") or 0.0
+    dd_text = ""
+    try:
+        if float(dd_pct) > 10.0:
+            dd = float(dd_pct) / 100.0 if float(dd_pct) > 1.0 else float(dd_pct)
+            if dd < 1.0:
+                recovery = (1 / (1 - dd)) - 1
+                dd_text = f"\n⚠️ Drawdown at {dd*100:.1f}% | Requires {recovery*100:.1f}% gain to recover"
+    except Exception:
+        pass
+        
+    # Half-Kelly Transparency (Prompt 28)
+    win_rate = strategy.get("win_rate")
+    payoff = strategy.get("r_multiple_avg") or strategy.get("avg_gain")
+    lots = strategy.get("lots")
+    if lots is None:
+        size_text = "NA"
+    elif win_rate and payoff:
+        size_text = f"{lots} Lots (Half-Kelly calculated via {float(win_rate)*100:.1f}% Win Rate & {float(payoff):.2f} Payoff)"
+    else:
+        size_text = f"{lots} Lots"
+
     raw = "\n".join(
         [
             "AXIS SIGNAL",
@@ -50,7 +73,7 @@ def build_alert(state: AxisState) -> str:
             f"VIX: {_fmt(context.get('vix'))}",
             "",
             "4. EV / Risk",
-            f"Risk Approved: {_fmt(state.risk_approved)}",
+            f"Risk Approved: {_fmt(state.risk_approved)}{dd_text}",
             f"Stop Distance: {_strategy_value(strategy, 'stop_distance')}",
             f"No Averaging Losers: {_strategy_value(strategy, 'never_average_loser')}",
             "",
@@ -59,6 +82,7 @@ def build_alert(state: AxisState) -> str:
             f"Data Quality: {_fmt(state.data_quality)}",
             "",
             "6. Trade Parameters",
+            f"Size: {size_text}",
             f"Entry: {_strategy_value(strategy, 'entry')}",
             f"Stop Loss: {_strategy_value(strategy, 'stop_loss')}",
             f"Target 1: {_strategy_value(strategy, 'target_1')}",
@@ -67,6 +91,8 @@ def build_alert(state: AxisState) -> str:
             "7. Verdict",
             f"Verifier: {_fmt(decision)}",
             f"Dedup: {_fmt(state.dedup_status)}",
+            "",
+            "[PYRAMID DIRECTIVE: Pending Tier 5 Implementation]"
         ]
     )
     return sanitize_telegram_md(raw)
