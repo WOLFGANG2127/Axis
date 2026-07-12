@@ -166,6 +166,11 @@
   <div class="header">
     <h1>AXIS Dashboard</h1>
     <div class="status-container">
+      <a href="strategies.html" style="color:var(--accent-color);font-size:.85rem;font-weight:600;text-decoration:none;margin-right:8px;">Strategies Hub →</a>
+      <div class="status-badge" id="badge-realtime">
+        <div class="dot" id="dot-realtime"></div>
+        Realtime <span id="text-realtime" style="color: var(--text-muted)">Connecting…</span>
+      </div>
       <div class="status-badge">
         <div class="dot" id="dot-nifty"></div>
         NIFTY <span id="time-nifty" style="color: var(--text-muted)">--</span>
@@ -226,6 +231,67 @@
     </div>
   </div>
 
+  <!-- Strategy Widget -->
+  <div style="margin-top:24px;">
+    <div class="panel" style="background:var(--panel-bg);border:1px solid var(--border-color);border-radius:12px;padding:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="margin:0;">Top Strategies</h2>
+        <a href="strategies.html" style="color:var(--accent-color);font-size:.82rem;font-weight:500;text-decoration:none;">View All →</a>
+      </div>
+      <div id="strategy-widget-container">
+        <div style="color:var(--text-muted);font-size:.85rem;padding:12px 0;">Loading strategies…</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js"></script>
   <script src="app.js"></script>
+  <script>
+    // Strategy widget — loads top strategies with sample-floor gating
+    async function loadStrategyWidget() {
+      const sb = window._axisSupabase;
+      if (!sb) return;
+      const { data: strategies } = await sb.from('strategies')
+        .select('strategy_id, display_name, status').eq('status','active').limit(5);
+      const { data: outcomes } = await sb.from('trade_outcomes')
+        .select('strategy_id, status, pnl_rupees').in('status',['WIN','LOSS','BREAKEVEN']);
+
+      const countMap = {}; const perfMap = {};
+      (outcomes||[]).forEach(r => {
+        countMap[r.strategy_id] = (countMap[r.strategy_id]||0)+1;
+        if(!perfMap[r.strategy_id]) perfMap[r.strategy_id]={wins:0,total:0};
+        perfMap[r.strategy_id].total++;
+        if(r.status==='WIN') perfMap[r.strategy_id].wins++;
+      });
+
+      const container = document.getElementById('strategy-widget-container');
+      if(!strategies || strategies.length===0){
+        container.innerHTML='<div style="color:var(--text-muted);font-size:.85rem;">No active strategies found.</div>'; return;
+      }
+      container.innerHTML = strategies.slice(0,3).map(s=>{
+        const count = countMap[s.strategy_id]||0;
+        const p = perfMap[s.strategy_id]||{wins:0,total:0};
+        const wr = (count>=15 && p.total>0) ? Math.round(p.wins/p.total*100)+'%' : null;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;
+          padding:10px 0;border-bottom:1px solid var(--border-color);">
+          <div>
+            <a href="strategy.html?id=${encodeURIComponent(s.strategy_id)}"
+              style="color:var(--text-main);font-weight:600;text-decoration:none;font-size:.9rem;">${s.display_name}</a>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;">${s.strategy_id}</div>
+          </div>
+          <div style="text-align:right;">
+            ${wr ? `<div style="color:var(--green);font-weight:600;">${wr} WR</div>` :
+              `<div style="color:var(--yellow);font-size:.78rem;">⚠ ${count}/15 trades</div>`}
+            <div style="font-size:.75rem;color:var(--text-muted);">SHADOW</div>
+          </div>
+        </div>`;
+      }).join('')
+      + `<div style="padding-top:10px;text-align:center;">
+          <a href="strategies.html" style="color:var(--accent-color);font-size:.82rem;">View All Strategies →</a>
+         </div>`;
+    }
+    // Called by app.js after supabase is initialised
+    window._onSupabaseReady = loadStrategyWidget;
+  </script>
 </body>
 </html>

@@ -1,0 +1,20 @@
+strategy_id: wyckoff_mean_reversion
+display_name: "Wyckoff Mean Reversion"
+version: 1
+symbols: [NIFTY, BANKNIFTY]
+status: active
+source: uploaded
+risk:
+  rr_floor: 2.0
+  stop_buffer_pct: 0.15
+  position_size_pct_cap: 2.0
+  margin_buffer_pct: 15
+entry_parameters:
+  volume_expansion_ratio: 1.4
+  stop_buffer_pct: 0.0015
+  target_buffer_pct: 0.0025
+paper_capital_allocated: 100000
+required_indicators: [candles, volume_profile, order_flow, market_structure]
+alert:
+  template: default
+  include_sections: [session, conditions, order_flow, ev_risk, trade_params, verdict]

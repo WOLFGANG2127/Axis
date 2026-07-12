@@ -104,6 +104,20 @@ def _trust_statuses(value: Any, path: str = "market_context") -> list[tuple[str,
 async def data_verification_node(state: AxisState) -> dict:
     statuses = _trust_statuses(_context(state))
     degraded = any(status != "live" for _, status in statuses)
+    context = _context(state)
+    if state.symbol and context.get("candles"):
+        try:
+            from src.data.ohlc_writer import persist_ohlc_candles
+
+            persist_ohlc_candles(
+                symbol=state.symbol,
+                candles=context.get("candles"),
+                interval=str(context.get("candle_interval") or "5"),
+                cycle_timestamp=state.cycle_timestamp,
+                correlation_id=state.correlation_id,
+            )
+        except Exception as exc:
+            _log.error("OHLC persistence failed for %s: %s", state.symbol, exc)
     return {
         "data_quality": {
             "sources_checked": len(statuses),

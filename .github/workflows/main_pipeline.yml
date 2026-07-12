@@ -8,11 +8,8 @@ on:
 jobs:
   trade:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        symbol: [NIFTY, BANKNIFTY]
     concurrency:
-      group: "${{ github.workflow }}-${{ matrix.symbol }}"
+      group: "${{ github.workflow }}"
       cancel-in-progress: false
 
     steps:
@@ -45,6 +42,7 @@ jobs:
           ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
           DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
           DHAN_TOTP_SECRET: ${{ secrets.DHAN_TOTP_SECRET }}
@@ -64,4 +62,5 @@ jobs:
           LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
-          python main.py --symbol ${{ matrix.symbol }}
+          python main.py --all
+

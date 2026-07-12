@@ -88,5 +88,30 @@ async def _amain() -> None:
     print(result)
 
 
+def _send_pipeline_crash_alert(exc: BaseException) -> None:
+    """Best-effort crash alert for GitHub Actions / unattended runs."""
+
+    try:
+        from src.config.settings import settings
+        from src.delivery.telegram_formatter import send_telegram_alert
+
+        send_telegram_alert(
+            settings.TELEGRAM_BOT_TOKEN,
+            settings.TELEGRAM_CHAT_ID,
+            f"AXIS PIPELINE CRASHED\n\n{type(exc).__name__}: {exc}",
+        )
+    except Exception:
+        # Never mask the original pipeline exception.
+        return
+
+
+def _run_cli() -> None:
+    try:
+        asyncio.run(_amain())
+    except Exception as exc:
+        _send_pipeline_crash_alert(exc)
+        raise
+
+
 if __name__ == "__main__":
-    asyncio.run(_amain())
+    _run_cli()

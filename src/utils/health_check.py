@@ -48,7 +48,7 @@ def _check_env_vars() -> dict[str, Any]:
         from src.config.settings import settings
         required = [
             "GOOGLE_API_KEY", "GROQ_API_KEY", "ZAI_API_KEY",
-            "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID",
+            "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "TELEGRAM_WEBHOOK_SECRET",
             "DHAN_CLIENT_ID", "DHAN_ACCESS_TOKEN",
             "DHAN_TOTP_SECRET", "DHAN_PIN",
             "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY",
@@ -94,3 +94,4 @@ def run_smoke_test() -> dict[str, Any]:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     run_smoke_test()
+

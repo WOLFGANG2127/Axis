@@ -17,8 +17,11 @@ for _key, _value in {
     "ZAI_API_KEY": "test-zai",
     "TELEGRAM_BOT_TOKEN": "123:test",
     "TELEGRAM_CHAT_ID": "-100123",
+    "TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret",
     "DHAN_CLIENT_ID": "123456",
     "DHAN_ACCESS_TOKEN": "test-token",
+    "DHAN_TOTP_SECRET": "test-totp",
+    "DHAN_PIN": "1234",
     "SUPABASE_URL": "https://example.supabase.co",
     "SUPABASE_ANON_KEY": "test-anon",
     "SUPABASE_SERVICE_ROLE_KEY": "test-service",
@@ -133,3 +136,4 @@ def test_resolver_raises_for_zero_or_multiple_exact_matches():
         resolve("NIFTY", 24100, "2026-07-09", "PE", master_rows=[row])
     with pytest.raises(AmbiguousInstrumentError):
         resolve("NIFTY", 24000, "2026-07-09", "PE", master_rows=[row, row])
+

@@ -20,8 +20,11 @@ def _fake_env(monkeypatch):
         "ZAI_API_KEY": "zai",
         "TELEGRAM_BOT_TOKEN": "token",
         "TELEGRAM_CHAT_ID": "123",
+        "TELEGRAM_WEBHOOK_SECRET": "webhook-secret",
         "DHAN_CLIENT_ID": "dhan",
         "DHAN_ACCESS_TOKEN": "dhan-token",
+        "DHAN_TOTP_SECRET": "totp",
+        "DHAN_PIN": "1234",
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_ANON_KEY": "anon",
         "SUPABASE_SERVICE_ROLE_KEY": "service",
@@ -184,3 +187,4 @@ def test_main_rejects_invalid_symbol():
 
     with pytest.raises(ValueError):
         asyncio.run(main.run_cycle("FINNIFTY", now=datetime(2026, 7, 8, 10, 0, tzinfo=IST)))
+

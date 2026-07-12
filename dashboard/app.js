@@ -38,6 +38,8 @@ function initApp() {
     const url = localStorage.getItem('SUPABASE_URL');
     const key = localStorage.getItem('SUPABASE_ANON_KEY');
     supabase = window.supabase.createClient(url, key);
+    window._axisSupabase = supabase; // expose for strategy widget
+    if (typeof window._onSupabaseReady === 'function') window._onSupabaseReady();
 
     // 1. Live signals feed via Supabase Realtime
     supabase

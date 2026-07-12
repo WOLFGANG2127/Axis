@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     ZAI_API_KEY: str = Field(min_length=1)
     TELEGRAM_BOT_TOKEN: str = Field(min_length=1)
     TELEGRAM_CHAT_ID: str = Field(min_length=1)
+    TELEGRAM_WEBHOOK_SECRET: str = Field(min_length=1)
     DHAN_CLIENT_ID: str = Field(min_length=1)
     DHAN_ACCESS_TOKEN: str = Field(min_length=1)
     DHAN_TOTP_SECRET: str = Field(min_length=1)
@@ -79,3 +80,4 @@ def _load_settings() -> Settings:
 
 
 settings = _load_settings()
+

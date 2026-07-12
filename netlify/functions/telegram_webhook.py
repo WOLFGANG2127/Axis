@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 logger = logging.getLogger("axis.webhook")
 logger.setLevel(logging.INFO)
@@ -13,6 +14,19 @@ def handler(event, context):
             "statusCode": 405,
             "body": "Method Not Allowed"
         }
+    
+    # 1b. Verify Telegram secret token (set via setWebhook's secret_token param)
+    expected_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
+    if expected_secret:
+        headers = event.get("headers", {})
+        # Netlify lowercases header names
+        received_secret = headers.get("x-telegram-bot-api-secret-token", "")
+        if received_secret != expected_secret:
+            logger.warning("Webhook rejected: invalid secret token")
+            return {
+                "statusCode": 401,
+                "body": "Unauthorized"
+            }
         
     try:
         # 2. Parse payload
@@ -64,14 +78,24 @@ def handler(event, context):
                 except Exception as e:
                     logger.error("Failed to clear cooling_off_until in DB: %s", e)
                     
-                # Edit the message to reflect the override
-                edit_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageText"
-                requests.post(edit_url, json={
-                    "chat_id": chat_id,
-                    "message_id": message_id,
-                    "text": "🔓 **OVERRIDE ACCEPTED**\n\nThe cooling-off period has been manually cleared. Trading is re-enabled. Exercise caution.",
-                    "parse_mode": "Markdown"
-                }, timeout=10.0)
+                # Edit the message to reflect the override through the shared sanitizer/queue.
+                override_text = "OVERRIDE ACCEPTED\n\nThe cooling-off period has been manually cleared. Trading is re-enabled. Exercise caution."
+                try:
+                    from src.delivery.telegram_formatter import sanitize_telegram_md, send_telegram_payload
+                    sent = send_telegram_payload(settings.TELEGRAM_BOT_TOKEN, "editMessageText", {
+                        "chat_id": chat_id,
+                        "message_id": message_id,
+                        "text": f"?? {sanitize_telegram_md(override_text)}",
+                        "parse_mode": "MarkdownV2"
+                    }, timeout=10.0)
+                    if not sent:
+                        send_telegram_payload(settings.TELEGRAM_BOT_TOKEN, "editMessageText", {
+                            "chat_id": chat_id,
+                            "message_id": message_id,
+                            "text": f"?? {override_text}",
+                        }, timeout=10.0)
+                except Exception:
+                    pass
             
         elif "message" in payload:
             # Standard text reply
@@ -111,3 +135,4 @@ def handler(event, context):
             "statusCode": 200,
             "body": "OK"
         }
+
