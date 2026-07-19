@@ -32,19 +32,19 @@ jobs:
           
       - name: Run No-Trade Day Summary
         env:
-          GOOGLE_API_KEY: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-          GROQ_API_KEY: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-          ZAI_API_KEY: "dummy_zai_api_key_string"
+          GOOGLE_API_KEY: "AIzaSyDummyKey_FormatXyz1234567890"
+          GROQ_API_KEY: "gsk_dummy_groq_key_abcdefghijklmnopqrstuvwx"
+          ZAI_API_KEY: "zai_dummy_key_1234567890abcdef"
           TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
           TELEGRAM_CHAT_ID: "123456789"
-          TELEGRAM_WEBHOOK_SECRET: "dummy_webhook_secret_string"
-          DHAN_CLIENT_ID: "dummy_dhan_client_id_string"
-          DHAN_ACCESS_TOKEN: "dummy_dhan_access_token_string"
-          DHAN_TOTP_SECRET: "dummy_dhan_totp_secret_string"
-          DHAN_PIN: "123456"
-          SUPABASE_URL: "https://dummyarchitecture.supabase.co"
-          SUPABASE_ANON_KEY: "dummy_supabase_anon_key_string"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy_supabase_service_role_key_string"
+          TELEGRAM_WEBHOOK_SECRET: "dummy_webhook_secret_value_xyz"
+          DHAN_CLIENT_ID: "1234567890"
+          DHAN_ACCESS_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_dhan_access_token_value"
+          DHAN_TOTP_SECRET: "JBSWY3DPEHPK3PXP"
+          DHAN_PIN: "1234"
+          SUPABASE_URL: "https://dummyprojectid.supabase.co"
+          SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_anon_key_value"
+          SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_service_role_key_value"
           AXIS_MONTHLY_EXPIRIES: "[]"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
