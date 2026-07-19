@@ -2,13 +2,27 @@ name: No-Trade Day Summary
 
 on:
   schedule:
-    # 10:01 UTC is 15:31 (3:31 PM) IST (Monday-Friday)
     - cron: '1 10 * * 1-5'
   workflow_dispatch:
 
 jobs:
   run-summary:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_API_KEY: "dummy_google_api_key_string"
+      GROQ_API_KEY: "dummy_groq_api_key_string"
+      ZAI_API_KEY: "dummy_zai_api_key_string"
+      TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+      TELEGRAM_CHAT_ID: "123456789"
+      TELEGRAM_WEBHOOK_SECRET: "dummy_webhook_secret_string"
+      DHAN_CLIENT_ID: "dummy_dhan_client_id_string"
+      DHAN_ACCESS_TOKEN: "dummy_dhan_access_token_string"
+      DHAN_TOTP_SECRET: "dummy_dhan_totp_secret_string"
+      DHAN_PIN: "123456"
+      SUPABASE_URL: "https://dummyarchitecture.supabase.co"
+      SUPABASE_ANON_KEY: "dummy_supabase_anon_key_string"
+      SUPABASE_SERVICE_ROLE_KEY: "dummy_supabase_service_role_key_string"
+      AXIS_MONTHLY_EXPIRIES: "[]"
     steps:
       - uses: actions/checkout@v4
       
@@ -27,21 +41,6 @@ jobs:
           pip install -r requirements.txt
           
       - name: Run No-Trade Day Summary
-        env:
-          GOOGLE_API_KEY: "dummy_google_api_key_string"
-          GROQ_API_KEY: "dummy_groq_api_key_string"
-          ZAI_API_KEY: "dummy_zai_api_key_string"
-          TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-          TELEGRAM_CHAT_ID: "123456789"
-          TELEGRAM_WEBHOOK_SECRET: "dummy_webhook_secret_string"
-          DHAN_CLIENT_ID: "dummy_dhan_client_id_string"
-          DHAN_ACCESS_TOKEN: "dummy_dhan_access_token_string"
-          DHAN_TOTP_SECRET: "dummy_dhan_totp_secret_string"
-          DHAN_PIN: "123456"
-          SUPABASE_URL: "https://dummyarchitecture.supabase.co"
-          SUPABASE_ANON_KEY: "dummy_supabase_anon_key_string"
-          SUPABASE_SERVICE_ROLE_KEY: "dummy_supabase_service_role_key_string"
-          AXIS_MONTHLY_EXPIRIES: "[]"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python src/scheduling/no_trade_summary.py
