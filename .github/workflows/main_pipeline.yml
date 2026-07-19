@@ -30,7 +30,10 @@ jobs:
         run: |
           python -c "import sys; from src.scheduling.calendar_gate import is_market_open; sys.exit(0 if is_market_open() else 1)" || echo "skip=true" >> $GITHUB_OUTPUT
 
-      - name: Install Dependencies
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libmagic1
+
+      - name: Install dependencies
         if: steps.market_check.outputs.skip != 'true'
         run: |
           python -m pip install --upgrade pip
