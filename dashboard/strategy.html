@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AXIS — Strategy Detail</title>
+  <meta name="description" content="AXIS Strategy Detail — Personalized dashboard with charting, governance, and performance metrics.">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -37,7 +38,7 @@
     @media(max-width:900px){.layout{grid-template-columns:1fr}}
 
     .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
-    .panel h2{font-size:1rem;font-weight:600;margin-bottom:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.06em;font-size:.8rem}
+    .panel h2{font-size:.8rem;font-weight:600;margin-bottom:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
     /* chart */
     #chart-wrap{position:relative}
@@ -66,7 +67,7 @@
     .signal-verdict-BLOCK{color:var(--red);font-weight:600}
     .signal-reasoning{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.5}
 
-    /* governance log */
+    /* governance / prs / macro rows */
     .gov-row{padding:10px 0;border-bottom:1px solid var(--border);font-size:.82rem}
     .gov-row:last-child{border-bottom:none}
 
@@ -105,6 +106,9 @@
 </nav>
 
 <div class="page">
+  <!-- Honesty-state banner (shared with main dashboard) -->
+  <div id="honesty-banner"></div>
+
   <div class="page-header">
     <div>
       <h1 id="page-title">Loading…</h1>
@@ -203,14 +207,38 @@
         </p>
       </div>
 
-      <!-- Governance log -->
+      <!-- Governance log (parameterized by strategy context) -->
       <div class="panel">
-        <h2>Governance Log</h2>
+        <h2>🛡️ Governance Log</h2>
         <div id="governance-container">
           <div class="empty-state">
             <div class="empty-icon">🛡️</div>
             <h3>No Governance Events</h3>
             <p>No governance gate evaluations recorded yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRS / Trader Session (Phase 6 — reused from main dashboard) -->
+      <div class="panel">
+        <h2>📋 PRS / Session State</h2>
+        <div id="prs-container">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <h3>No Session State</h3>
+            <p>PRS quiz not yet completed today.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Macro Regime (Phase 6 — filtered by current symbol) -->
+      <div class="panel">
+        <h2>🌐 Cross-Symbol Flags</h2>
+        <div id="macro-container">
+          <div class="empty-state">
+            <div class="empty-icon">🌐</div>
+            <h3>No Flags</h3>
+            <p>No cross-symbol correlation signals yet.</p>
           </div>
         </div>
       </div>
@@ -236,7 +264,8 @@
   // ── Bootstrap ─────────────────────────────────────────────────────────────
   document.body.insertAdjacentHTML('afterbegin', CONFIG_MODAL_HTML);
   document.getElementById('btn-save-config').onclick = () => saveConfig(boot);
-  document.getElementById('btn-open-config') && (document.getElementById('btn-open-config').onclick = (e)=>{e.preventDefault();document.getElementById('config-modal').style.display='flex';});
+  const configNavLink = document.getElementById('config-nav-link');
+  if (configNavLink) configNavLink.onclick = (e) => { e.preventDefault(); document.getElementById('config-modal').style.display = 'flex'; };
 
   const params = new URLSearchParams(location.search);
   const strategyId = params.get('id') || 'gvof';
@@ -244,7 +273,7 @@
   let chart = null, candleSeries = null;
 
   document.getElementById('config-page-link').href = `strategy-config.html?id=${encodeURIComponent(strategyId)}`;
-  document.getElementById('config-nav-link').href = `strategy-config.html?id=${encodeURIComponent(strategyId)}`;
+  if (configNavLink) configNavLink.href = `strategy-config.html?id=${encodeURIComponent(strategyId)}`;
 
   function switchSymbol(sym) {
     currentSymbol = sym;
@@ -257,6 +286,25 @@
 
   async function boot() {
     const sb = getSupabase(); if (!sb) return;
+
+    // Set up shared Realtime channel (ONE channel for all strategy tabs)
+    getSharedChannel(sb);
+    onSharedChannelEvent({
+      table: 'trade_outcomes',
+      strategyId: strategyId,
+      callback: () => { loadSignals(sb); loadTrades(sb); },
+    });
+    onSharedChannelEvent({
+      table: 'governance_actions',
+      callback: () => loadGovernance(sb),
+    });
+
+    // Honesty state polling
+    pollNetlifyHealth();
+    setInterval(pollNetlifyHealth, 60000);
+    setInterval(() => renderHonestyBanner('honesty-banner'), 30000);
+    renderHonestyBanner('honesty-banner');
+
     // Load strategy meta
     const { data: s } = await sb.from('strategies')
       .select('strategy_id, display_name, version, status, source, created_at')
@@ -329,12 +377,16 @@
     chart.timeScale().fitContent();
   }
 
-  // Render overlay lines from a signal's signal_metadata (computed values only, no user-drawn)
+  // Render overlay lines from signal_metadata (computed values only, no user-drawn)
+  // Reads both flat keys AND chart_overlays sub-object per the multi-strategy roadmap
   function applyOverlays(signalMeta) {
     if (!chart || !signalMeta) return;
-    // Remove previous overlay series (stored on window)
+    // Remove previous overlay series
     (window._overlays || []).forEach(s => { try { chart.removeSeries(s); } catch(e){} });
     window._overlays = [];
+
+    // Support chart_overlays sub-key (Phase 7 spec) AND flat keys (backward compat)
+    const overlays = signalMeta.chart_overlays || signalMeta;
 
     const addLine = (price, color, title) => {
       if (!price) return;
@@ -346,13 +398,20 @@
       window._overlays.push(s);
     };
 
-    addLine(signalMeta.entry,              '#10b981', 'Entry');
-    addLine(signalMeta.stop_loss,          '#ef4444', 'Stop');
-    addLine(signalMeta.target_1,           '#f59e0b', 'T1');
-    addLine(signalMeta.target_2,           '#8b5cf6', 'T2');
-    addLine(signalMeta.value_area_high,    'rgba(245,158,11,0.5)', 'VAH');
-    addLine(signalMeta.value_area_low,     'rgba(245,158,11,0.5)', 'VAL');
-    addLine(signalMeta.volume_profile_poc, 'rgba(139,92,246,0.6)', 'VPOC');
+    addLine(overlays.entry,              '#10b981', 'Entry');
+    addLine(overlays.stop_loss,          '#ef4444', 'Stop');
+    addLine(overlays.target_1,           '#f59e0b', 'T1');
+    addLine(overlays.target_2,           '#8b5cf6', 'T2');
+    addLine(overlays.value_area_high,    'rgba(245,158,11,0.5)', 'VAH');
+    addLine(overlays.value_area_low,     'rgba(245,158,11,0.5)', 'VAL');
+    addLine(overlays.volume_profile_poc, 'rgba(139,92,246,0.6)', 'VPOC');
+
+    // Fibonacci zones from chart_overlays (if present)
+    if (overlays.fibonacci_zones && Array.isArray(overlays.fibonacci_zones)) {
+      overlays.fibonacci_zones.forEach((fib, i) => {
+        addLine(fib.level || fib.price, 'rgba(59,130,246,0.4)', `Fib ${fib.ratio || (i+1)}`);
+      });
+    }
   }
 
   // ── Signal history ────────────────────────────────────────────────────────
@@ -409,29 +468,29 @@
       .select('timestamp, gate_name, mode, would_block, did_block, reason')
       .order('timestamp', { ascending: false }).limit(10);
 
-    const container = document.getElementById('governance-container');
-    if (!data || data.length === 0) {
-      container.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">🛡️</div><h3>No Governance Events</h3>
-        <p>No gate evaluations recorded yet.</p></div>`;
-      return;
-    }
-    container.innerHTML = data.map(a => {
-      const status = a.did_block
-        ? `<span style="color:var(--red)">BLOCKED</span>`
-        : a.would_block
-          ? `<span style="color:var(--yellow)">SHADOW BLOCK</span>`
-          : `<span style="color:var(--green)">PASS</span>`;
-      return `<div class="gov-row">
-        <div style="display:flex;justify-content:space-between">
-          <strong>${a.gate_name}</strong>${status}
-        </div>
-        <div style="color:var(--muted);font-size:.78rem;margin-top:2px">
-          ${a.mode} · ${formatTimeIST(a.timestamp)}<br>
-          ${a.reason ? a.reason.slice(0,100) : ''}
-        </div>
-      </div>`;
-    }).join('');
+    renderGovernancePanel('governance-container', data);
+  }
+
+  // ── PRS / Trader Session ──────────────────────────────────────────────────
+  async function loadTraderSession(sb) {
+    const now = new Date();
+    const istStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const { data } = await sb.from('trader_session_state')
+      .select('*')
+      .eq('trading_date', istStr)
+      .order('created_at', { ascending: false });
+
+    renderTraderSessionPanel('prs-container', data);
+  }
+
+  // ── Macro Regime (filtered by current symbol) ─────────────────────────────
+  async function loadMacroRegime(sb) {
+    const { data } = await sb.from('macro_regime_flags')
+      .select('signal_timestamp, symbol, direction, session_id')
+      .order('signal_timestamp', { ascending: false })
+      .limit(10);
+
+    renderMacroRegimePanel('macro-container', data);
   }
 
   // ── Paper trades ─────────────────────────────────────────────────────────
@@ -447,15 +506,15 @@
     const total = (data||[]).length;
     const grossWin = (data||[]).filter(r=>r.status==='WIN').reduce((a,r)=>a+Number(r.pnl_rupees||0),0);
     const grossLoss = Math.abs((data||[]).filter(r=>r.status==='LOSS').reduce((a,r)=>a+Number(r.pnl_rupees||0),0));
-    const MIN_FLOOR = 15;
+    const FLOOR = 15;
 
     document.getElementById('m-trades').textContent = total;
-    if (total >= MIN_FLOOR) {
+    if (total >= FLOOR) {
       document.getElementById('m-winrate').textContent = total > 0 ? Math.round(wins/total*100)+'%' : '—';
       document.getElementById('m-pf').textContent = grossLoss > 0 ? (grossWin/grossLoss).toFixed(2) : '—';
       document.getElementById('m-floor-note').textContent = `${wins} wins / ${total} trades`;
     } else {
-      document.getElementById('m-floor-note').textContent = `Need ${MIN_FLOOR} for ranking (${total}/${MIN_FLOOR})`;
+      document.getElementById('m-floor-note').textContent = `Need ${FLOOR} for ranking (${total}/${FLOOR})`;
     }
 
     const container = document.getElementById('trades-container');
@@ -463,8 +522,8 @@
       container.innerHTML = `<div class="empty-state">
         <div class="empty-icon">📋</div><h3>No Closed Trades</h3>
         <p>No closed paper trades for this strategy/symbol.</p>
-        ${total < MIN_FLOOR ? `<div class="progress-bar-wrap"><div class="progress-bar" style="width:${Math.min(100,Math.round(total/MIN_FLOOR*100))}%"></div></div>
-        <p class="progress-label">${total} / ${MIN_FLOOR} trades needed for ranking</p>` : ''}
+        ${total < FLOOR ? `<div class="progress-bar-wrap"><div class="progress-bar" style="width:${Math.min(100,Math.round(total/FLOOR*100))}%"></div></div>
+        <p class="progress-label">${total} / ${FLOOR} trades needed for ranking</p>` : ''}
       </div>`;
       return;
     }
@@ -483,7 +542,14 @@
 
   async function loadAll() {
     const sb = getSupabase(); if (!sb) return;
-    await Promise.all([loadChart(sb), loadSignals(sb), loadGovernance(sb), loadTrades(sb)]);
+    await Promise.all([
+      loadChart(sb),
+      loadSignals(sb),
+      loadGovernance(sb),
+      loadTrades(sb),
+      loadTraderSession(sb),
+      loadMacroRegime(sb),
+    ]);
   }
 
   checkAndBootstrap(boot);

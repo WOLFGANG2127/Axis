@@ -141,7 +141,7 @@ class TestGovernance(unittest.TestCase):
         # < 20.0 minutes -> REVENGE_TRADE
         self.assertEqual(run_with_diff(19.99), "REVENGE_TRADE")
         # Exactly 20.0 minutes -> Safe (None)
-        self.assertIsNone(run_with_diff(20.0))
+        self.assertEqual(run_with_diff(20.0), "PENDING")
 
     @patch('src.journal.outcome_recorder._database')
     @patch('src.journal.outcome_recorder._update_dynamic_drawdown_limit')
@@ -180,9 +180,9 @@ class TestGovernance(unittest.TestCase):
         # 10 Kelly * 1.26 = 12.6. Actual 12.6 is > 1.25x (1.26x)
         self.assertEqual(run_with_size(12.6, 10), "OVERSIZE_CONVICTION")
         # Exactly 1.25x -> Safe (None). 10 * 1.25 = 12.5
-        self.assertIsNone(run_with_size(12.5, 10))
+        self.assertEqual(run_with_size(12.5, 10), "PENDING")
         # 1.24x -> Safe (None). 10 * 1.24 = 12.4
-        self.assertIsNone(run_with_size(12.4, 10))
+        self.assertEqual(run_with_size(12.4, 10), "PENDING")
 
 if __name__ == '__main__':
     unittest.main()

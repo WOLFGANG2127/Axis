@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-LOT_SIZE_NIFTY = 65
-LOT_SIZE_BANKNIFTY = 30
-LOT_SIZE_NIFTYNXT50 = 25
+LOT_SIZES = {"NIFTY": 65, "BANKNIFTY": 30}
 
 BANKNIFTY_SHADOW_MIN_SESSIONS = 45
 BANKNIFTY_SHADOW_MIN_PROFIT_FACTOR = 1.5
@@ -13,12 +11,8 @@ BANKNIFTY_SHADOW_MAX_DRAWDOWN_PCT = 0.02
 
 def get_lot_size(symbol: str) -> int:
     symbol = symbol.strip().upper()
-    if symbol == "NIFTY":
-        return LOT_SIZE_NIFTY
-    elif symbol == "BANKNIFTY":
-        return LOT_SIZE_BANKNIFTY
-    elif symbol == "NIFTYNXT50":
-        return LOT_SIZE_NIFTYNXT50
+    if symbol in LOT_SIZES:
+        return LOT_SIZES[symbol]
     raise ValueError(f"Unknown symbol: {symbol}")
 
 RISK_FLAT_PCT = 0.01

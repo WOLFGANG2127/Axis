@@ -3,9 +3,8 @@
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import requests
-
 from src.config.settings import settings
+from src.delivery.telegram_formatter import sanitize_telegram_md, send_telegram_payload
 
 logger = logging.getLogger("axis.ui")
 IST = ZoneInfo("Asia/Kolkata")
@@ -17,20 +16,19 @@ def send_cooling_off_ui(cooling_off_until_iso: str) -> bool:
     """
     bot_token = settings.TELEGRAM_BOT_TOKEN
     chat_id = settings.TELEGRAM_CHAT_ID
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    
     try:
         dt = datetime.fromisoformat(cooling_off_until_iso.replace("Z", "+00:00")).astimezone(IST)
         time_str = dt.strftime("%I:%M %p IST")
     except Exception:
         time_str = cooling_off_until_iso
 
-    text = (
-        "🛑 **CIRCUIT BREAKER ENGAGED**\n\n"
+    raw_text = (
+        "CIRCUIT BREAKER ENGAGED\n\n"
         "Trading has been suspended to protect capital.\n"
-        f"⏳ **Cooling-Off Period Until:** {time_str}\n\n"
+        f"Cooling-Off Period Until: {time_str}\n\n"
         "You may manually override this lock, but doing so bypasses structural safety gates."
     )
+    text = sanitize_telegram_md(raw_text)
     
     reply_markup = {
         "inline_keyboard": [
@@ -40,19 +38,13 @@ def send_cooling_off_ui(cooling_off_until_iso: str) -> bool:
         ]
     }
     
-    try:
-        response = requests.post(
-            url,
-            json={
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "Markdown",
-                "reply_markup": reply_markup,
-            },
-            timeout=10.0,
-        )
-        response.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error("Failed to send Cooling-Off UI: %s", e)
-        return False
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "MarkdownV2",
+        "reply_markup": reply_markup,
+    }
+    sent = send_telegram_payload(bot_token, "sendMessage", payload, timeout=10.0)
+    if not sent:
+        logger.error("Failed to send Cooling-Off UI")
+    return sent

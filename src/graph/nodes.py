@@ -176,7 +176,6 @@ async def strategy_activation_node(state: AxisState) -> dict:
             "node_error": {"node": "strategy_activation", "message": str(exc)},
         }
 
-
 async def analyst_node(state: AxisState) -> dict:
     try:
         if SERVICES.analyst:

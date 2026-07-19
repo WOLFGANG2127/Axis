@@ -300,12 +300,8 @@ def expected_value(
         raise ValueError("win_prob must be between 0 and 1")
     if avg_gain < 0 or avg_loss < 0 or est_transaction_cost < 0:
         raise ValueError("gain, loss, and transaction cost cannot be negative")
-        
-    # [PLACEHOLDER] - Empirical slippage data required to replace this 2.5 point hardcoded penalty.
-    # NOTE: Since symbol/quantity is not parameterized here, we assume a conservative 1 lot of NIFTY (65)
-    slippage_rupees = 2.5 * 65
-    
-    return (win_prob * avg_gain) - ((1.0 - win_prob) * avg_loss) - est_transaction_cost - slippage_rupees
+    # Slippage must be supplied by the caller; no unverified hardcoded penalty.
+    return (win_prob * avg_gain) - ((1.0 - win_prob) * avg_loss) - est_transaction_cost
 
 
 def kelly_fraction(win_prob: float, avg_gain: float, avg_loss: float) -> float:

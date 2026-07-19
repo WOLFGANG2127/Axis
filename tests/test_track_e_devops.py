@@ -17,7 +17,9 @@ def test_main_pipeline_workflow_is_centralized_sequential_and_not_matrix():
     assert "matrix:" not in workflow
     assert "python main.py --all" in workflow
     assert "cancel-in-progress: false" in workflow
-    assert "cron: '*/5 3-10 * * *'" in workflow
+    assert "cron: '40-59/5 3 * * *'" in workflow
+    assert "cron: '*/5 4-9 * * *'" in workflow
+    assert "cron: '0-5/5 10 * * *'" in workflow
 
 
 def test_main_pipeline_references_required_backend_secrets():

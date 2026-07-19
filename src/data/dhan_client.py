@@ -51,32 +51,17 @@ def _can_proceed(endpoint: str) -> bool:
 
 
 def _record_failure(endpoint: str) -> None:
-    """Increment failure counter and fire Telegram alert at threshold."""
+    """Atomically increment the Postgres breaker and alert exactly on trip."""
     try:
-        from src.database.supabase import get_supabase_client
-        client = get_supabase_client()
-        res = client.table("api_circuit_breakers").select("consecutive_failures").eq("endpoint", endpoint).execute()
-        
-        count = 1
-        if res.data:
-            count = int(res.data[0].get("consecutive_failures", 0)) + 1
-            
-        status = "OPEN" if count >= _CIRCUIT_THRESHOLD else "CLOSED"
-        now_iso = datetime.now(ZoneInfo("UTC")).isoformat()
-        
-        client.table("api_circuit_breakers").upsert({
-            "endpoint": endpoint,
-            "consecutive_failures": count,
-            "status": status,
-            "last_failure_at": now_iso
-        }).execute()
-        
+        from src.database import supabase
+        client = supabase.get_supabase_client()
+        result = client.rpc("increment_circuit_failure", {"p_endpoint": endpoint, "p_threshold": _CIRCUIT_THRESHOLD}).execute()
+        count = int(result.data or 0)
         logger.warning("Dhan %s failure #%d", endpoint, count)
         if count == _CIRCUIT_THRESHOLD:
             _fire_circuit_alert(endpoint, count)
     except Exception as exc:
         logger.error("Failed to record failure for %s: %s", endpoint, exc)
-
 
 def _record_success(endpoint: str) -> None:
     """Reset failure counter on success."""

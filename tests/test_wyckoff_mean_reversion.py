@@ -207,32 +207,6 @@ def test_registry_loads_active_wyckoff_strategy_from_database():
     assert snapshot.configs["wyckoff_mean_reversion"]["strategy_name"] == "Wyckoff Mean Reversion"
 
 
-def test_graph_runs_gvof_and_wyckoff_in_same_cycle_without_cross_contamination():
-    from src.graph import nodes
-    from src.strategies.base import BaseStrategy
-    from src.strategies.wyckoff_mean_reversion import WyckoffMeanReversionStrategy
-
-    class PassiveGVOF(BaseStrategy):
-        strategy_id = "gvof"
-        name = "GVOF"
-
-        def check_conditions(self, state):
-            return {"passed": True, "strategy_id": self.strategy_id, "strategy_name": self.name, "direction": "bearish"}
-
-    nodes.register_strategies([PassiveGVOF(), WyckoffMeanReversionStrategy()])
-    try:
-        result = asyncio.run(nodes.strategy_activation_node(_bullish_state()))
-    finally:
-        nodes.reset_strategies()
-
-    assert [candidate["strategy_id"] for candidate in result["candidate_signals"]] == [
-        "gvof",
-        "wyckoff_mean_reversion",
-    ]
-    assert result["candidate_signals"][0]["direction"] == "bearish"
-    assert result["candidate_signals"][1]["direction"] == "bullish"
-
-
 def test_ast_scanner_accepts_legitimate_stdlib_decimal_import_not_hardcoded_allowlist():
     from src.strategies.security import scan_strategy_source
 

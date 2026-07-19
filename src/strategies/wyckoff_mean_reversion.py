@@ -83,7 +83,7 @@ class WyckoffMeanReversionStrategy(BaseStrategy):
             return _failed("SPOT_UNAVAILABLE")
 
         entry_params = (
-            (state.strategy_config_snapshot or {})
+            (getattr(state, "strategy_config_snapshot", None) or {})
             .get(self.strategy_id, {})
             .get("entry_parameters", {})
         )

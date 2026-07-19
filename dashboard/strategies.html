@@ -251,6 +251,17 @@
         const sb = getSupabase();
         if (!sb) return;
 
+        // Set up shared Realtime channel (ONE for all strategy tabs)
+        getSharedChannel(sb);
+        onSharedChannelEvent({
+            table: 'trade_outcomes',
+            callback: () => initPage(), // re-render cards on new outcomes
+        });
+
+        // Netlify health + honesty state
+        pollNetlifyHealth();
+        setInterval(pollNetlifyHealth, 60000);
+
         const grid = document.getElementById('strategy-grid');
 
         // Fetch all active strategies

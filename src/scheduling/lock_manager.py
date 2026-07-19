@@ -107,3 +107,61 @@ def release_run_lock(symbol: str, *, db: Any | None = None) -> None:
         ).eq("lock_id", lock_id).execute()
     except Exception:
         _local_release(lock_id)
+
+
+def acquire_infrastructure_lock(
+    lock_name: str,
+    *,
+    ttl_seconds: int = 60,
+    db: Any | None = None,
+    now: datetime | None = None,
+) -> bool:
+    """Acquire a global infrastructure lock (e.g. for LLM rate limit mutex)."""
+
+    local_now = (now or datetime.now(IST)).astimezone(IST)
+    expires_at = local_now + timedelta(seconds=ttl_seconds)
+    database = db if db is not None else get_lock_db()
+    
+    if database is None:
+        return _local_acquire(f"infra_{lock_name}", expires_at)
+
+    try:
+        rows = _execute_data(
+            database.table("infrastructure_locks")
+            .select("lock_name,expires_at")
+            .eq("lock_name", lock_name)
+            .limit(1)
+        )
+        if rows:
+            expires_raw = rows[0].get("expires_at")
+            if expires_raw:
+                active_until = datetime.fromisoformat(str(expires_raw).replace("Z", "+00:00"))
+                if active_until.astimezone(IST) > local_now:
+                    return False
+                    
+        database.table("infrastructure_locks").upsert(
+            {
+                "lock_name": lock_name,
+                "acquired_at": local_now.isoformat(),
+                "expires_at": expires_at.isoformat(),
+            },
+            on_conflict="lock_name",
+        ).execute()
+        return True
+    except Exception:
+        return _local_acquire(f"infra_{lock_name}", expires_at)
+
+
+def release_infrastructure_lock(lock_name: str, *, db: Any | None = None) -> None:
+    """Release a global infrastructure lock."""
+    database = db if db is not None else get_lock_db()
+    if database is None:
+        _local_release(f"infra_{lock_name}")
+        return
+    try:
+        now = datetime.now(IST).isoformat()
+        database.table("infrastructure_locks").update(
+            {"expires_at": now}
+        ).eq("lock_name", lock_name).execute()
+    except Exception:
+        _local_release(f"infra_{lock_name}")

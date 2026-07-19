@@ -7,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.database.supabase import get_supabase_client
+from src.config.settings import settings
 
 logger = logging.getLogger("axis.risk")
 IST = ZoneInfo("Asia/Kolkata")
@@ -18,7 +19,6 @@ def check_daily_drawdown() -> bool:
     and the dynamic magnitude trigger (current_drawdown >= max_loss_limit) 
     using strict OR logic.
     """
-    from src.config.settings import settings
     mode = getattr(settings, "GOVERNANCE_DAILY_LOSS_MODE", "SHADOW")
     
     if mode == "OFF":

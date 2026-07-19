@@ -28,6 +28,17 @@ def get_monthly_expiries() -> set[date]:
     return _environment_dates("AXIS_MONTHLY_EXPIRIES")
 
 
+def is_expiry_day(symbol: str, reference: date | datetime) -> bool:
+    """Return the weekly/monthly expiry status in IST."""
+    day = _as_date(reference)
+    if day in get_monthly_expiries():
+        return True
+    if symbol.upper() == "NIFTY":
+        return day.weekday() == 1
+    if symbol.upper() == "BANKNIFTY":
+        return day.weekday() == 1 and (day + timedelta(days=7)).month != day.month
+    return False
+
 def previous_trading_day(
     reference_date: date | datetime,
     *,

@@ -141,6 +141,8 @@ def test_router_uses_gemini_then_zai_fallback_and_groq(monkeypatch):
         )
 
     monkeypatch.setattr(router, "_acompletion", fake_acompletion)
+    monkeypatch.setattr(router, 'acquire', lambda *args, **kwargs: asyncio.sleep(0, result=True))
+    monkeypatch.setattr(router, 'release', lambda *args, **kwargs: asyncio.sleep(0))
     state = AxisState(symbol="NIFTY", active_strategy={"strategy_name": "GVOF"})
     analyst = asyncio.run(router.call_llm_router("analyst", state))
     verifier = asyncio.run(router.call_llm_router("verifier", state))
@@ -168,6 +170,7 @@ def test_run_cycle_releases_lock_in_finally(monkeypatch):
 
     monkeypatch.setattr(main, "is_market_open", lambda _now: True)
     monkeypatch.setattr(main, "is_system_paused", lambda db=None: (False, None))
+    monkeypatch.setattr(main, 'check_prs_trading_gate', lambda **kwargs: type('Gate', (), {'allowed': True})())
     monkeypatch.setattr(main, "acquire_run_lock", lambda symbol, db=None, now=None: events.append(("acquire", symbol)) or True)
     monkeypatch.setattr(main, "release_run_lock", lambda symbol, db=None: events.append(("release", symbol)))
 

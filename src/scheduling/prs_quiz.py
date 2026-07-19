@@ -1,182 +1,34 @@
-"""Personal Readiness Score (PRS) Module."""
-
-from __future__ import annotations
-
-import logging
+﻿"""Personal Readiness Score (PRS) Telegram workflow via the shared queue."""
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
+import logging
 from src.config.settings import settings
 from src.database.supabase import get_supabase_client
 from src.delivery.telegram_formatter import sanitize_telegram_md, send_telegram_payload
 
-logger = logging.getLogger("axis.prs")
-IST = ZoneInfo("Asia/Kolkata")
-
-
-def _markdown_payload(*, chat_id: str, text: str, reply_markup: dict | None = None, message_id: int | None = None) -> dict:
-    payload = {
-        "chat_id": chat_id,
-        "text": sanitize_telegram_md(text.replace("**", "")),
-        "parse_mode": "MarkdownV2",
-    }
-    if message_id is not None:
-        payload["message_id"] = message_id
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    return payload
-
-
-def _plain_payload(*, chat_id: str, text: str, reply_markup: dict | None = None, message_id: int | None = None) -> dict:
-    payload = {"chat_id": chat_id, "text": text.replace("**", "")}
-    if message_id is not None:
-        payload["message_id"] = message_id
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    return payload
-
+logger=logging.getLogger("axis.prs")
+IST=ZoneInfo("Asia/Kolkata")
 
 def send_prs_quiz() -> None:
-    """Send the Morning Readiness Quiz via Telegram inline keyboard."""
-
-    bot_token = settings.TELEGRAM_BOT_TOKEN
-    chat_id = settings.TELEGRAM_CHAT_ID
-    text = (
-        "?? **Morning Personal Readiness Score (PRS)**\n\n"
-        "Let's assess your readiness to trade today.\n"
-        "**Q1/3: How was your Sleep Quality?**"
-    )
-    reply_markup = {
-        "inline_keyboard": [
-            [
-                {"text": "Excellent (3)", "callback_data": "prs_sleep_3"},
-                {"text": "Average (2)", "callback_data": "prs_sleep_2"},
-                {"text": "Poor (1)", "callback_data": "prs_sleep_1"},
-            ]
-        ]
-    }
-
+    payload={"chat_id":settings.TELEGRAM_CHAT_ID,"text":sanitize_telegram_md("Morning Personal Readiness Score (PRS)\n\nQ1/3: How was your Sleep Quality?"),"parse_mode":"MarkdownV2","reply_markup":{"inline_keyboard":[[{"text":"Excellent (3)","callback_data":"prs_sleep_3"},{"text":"Average (2)","callback_data":"prs_sleep_2"},{"text":"Poor (1)","callback_data":"prs_sleep_1"}]]}}
     try:
-        sent = send_telegram_payload(
-            bot_token,
-            "sendMessage",
-            _markdown_payload(chat_id=chat_id, text=text, reply_markup=reply_markup),
-            timeout=10.0,
-        )
-        if not sent:
-            send_telegram_payload(
-                bot_token,
-                "sendMessage",
-                _plain_payload(chat_id=chat_id, text=text, reply_markup=reply_markup),
-                timeout=10.0,
-            )
-        logger.info("Successfully dispatched PRS Quiz (Q1).")
-
-        db = get_supabase_client()
-        today = datetime.now(IST).date().isoformat()
-        existing = db.table("trader_session_state").select("id").eq("trading_date", today).execute()
-        if not existing.data:
-            db.table("trader_session_state").insert(
-                {
-                    "trading_date": today,
-                    "is_trading_blocked": False,
-                    "prs_score": 0,
-                    "prs_completed": False,
-                    "prs_completed_at": None,
-                    "prs_block_reason": None,
-                }
-            ).execute()
-    except Exception as exc:
-        logger.error("Failed to send PRS Quiz: %s", exc)
-
+        if not send_telegram_payload(settings.TELEGRAM_BOT_TOKEN,"sendMessage",payload): raise RuntimeError("Telegram PRS quiz delivery failed")
+        today=datetime.now(IST).date().isoformat(); db=get_supabase_client()
+        if not db.table("trader_session_state").select("id").eq("trading_date",today).execute().data:
+            db.table("trader_session_state").insert({"trading_date":today,"is_trading_blocked":False,"prs_score":0,"prs_completed":False,"prs_completed_at":None,"prs_block_reason":None}).execute()
+    except Exception as exc: logger.error("Failed to send PRS Quiz: %s",exc)
 
 def process_prs_callback(callback_data: str, message_id: int) -> None:
-    """Process PRS answers, advance the quiz, and update trader state."""
-
-    bot_token = settings.TELEGRAM_BOT_TOKEN
-    chat_id = settings.TELEGRAM_CHAT_ID
-    db = get_supabase_client()
-    today = datetime.now(IST).date().isoformat()
-
-    parts = callback_data.split("_")
-    if len(parts) != 3 or parts[0] != "prs":
-        return
-
-    question_type = parts[1]
-    score_val = int(parts[2])
-
-    session_res = db.table("trader_session_state").select("prs_score").eq("trading_date", today).execute()
-    current_score = session_res.data[0].get("prs_score", 0) if session_res.data else 0
-    new_score = current_score + score_val
-    db.table("trader_session_state").update({"prs_score": new_score}).eq("trading_date", today).execute()
-
-    next_text = ""
-    next_markup = None
-
-    if question_type == "sleep":
-        next_text = "?? **Q2/3: How is your Mental Clarity?**\n(Focus, distraction level, fatigue)"
-        next_markup = {
-            "inline_keyboard": [
-                [
-                    {"text": "Sharp (3)", "callback_data": "prs_clarity_3"},
-                    {"text": "Okay (2)", "callback_data": "prs_clarity_2"},
-                    {"text": "Foggy (1)", "callback_data": "prs_clarity_1"},
-                ]
-            ]
-        }
-    elif question_type == "clarity":
-        next_text = "?? **Q3/3: What is your Emotional State?**\n(Calm, tilted, stressed, euphoric)"
-        next_markup = {
-            "inline_keyboard": [
-                [
-                    {"text": "Calm & Neutral (3)", "callback_data": "prs_emotion_3"},
-                    {"text": "Slightly Anxious (2)", "callback_data": "prs_emotion_2"},
-                    {"text": "Tilted / Stressed (1)", "callback_data": "prs_emotion_1"},
-                ]
-            ]
-        }
-    elif question_type == "emotion":
-        completed_at = datetime.now(IST).isoformat()
-        if new_score < 6:
-            db.table("trader_session_state").update(
-                {
-                    "prs_completed": True,
-                    "prs_completed_at": completed_at,
-                    "is_trading_blocked": True,
-                    "prs_block_reason": "PRS_SCORE_BLOCKED",
-                }
-            ).eq("trading_date", today).execute()
-            next_text = f"?? **PRS Score: {new_score}/9**\n\nReadiness is too low. Trading has been **BLOCKED** for today to protect capital."
-        else:
-            db.table("trader_session_state").update(
-                {
-                    "prs_completed": True,
-                    "prs_completed_at": completed_at,
-                    "is_trading_blocked": False,
-                    "prs_block_reason": None,
-                }
-            ).eq("trading_date", today).execute()
-            next_text = f"? **PRS Score: {new_score}/9**\n\nReadiness is good. Trading systems are **APPROVED** for the session."
+    parts=callback_data.split("_")
+    if len(parts)!=3 or parts[0]!="prs": return
+    db=get_supabase_client(); today=datetime.now(IST).date().isoformat(); score=int(parts[2])
+    rows=db.table("trader_session_state").select("prs_score").eq("trading_date",today).execute().data or []
+    total=int(rows[0].get("prs_score",0) if rows else 0)+score
+    db.table("trader_session_state").update({"prs_score":total}).eq("trading_date",today).execute()
+    if parts[1]=="sleep": text,markup="Q2/3: How is your Mental Clarity?",[[{"text":"Sharp (3)","callback_data":"prs_clarity_3"}]]
+    elif parts[1]=="clarity": text,markup="Q3/3: What is your Emotional State?",[[{"text":"Calm (3)","callback_data":"prs_emotion_3"}]]
     else:
-        return
-
-    try:
-        sent = send_telegram_payload(
-            bot_token,
-            "editMessageText",
-            _markdown_payload(chat_id=chat_id, message_id=message_id, text=next_text, reply_markup=next_markup),
-            timeout=10.0,
-        )
-        if not sent:
-            send_telegram_payload(
-                bot_token,
-                "editMessageText",
-                _plain_payload(chat_id=chat_id, message_id=message_id, text=next_text, reply_markup=next_markup),
-                timeout=10.0,
-            )
-    except Exception as exc:
-        logger.error("Failed to edit PRS message: %s", exc)
-
-
-if __name__ == "__main__":
-    send_prs_quiz()
+        blocked=total<6; db.table("trader_session_state").update({"prs_completed":True,"is_trading_blocked":blocked,"prs_completed_at":datetime.now(IST).isoformat(),"prs_block_reason":"PRS_SCORE_BLOCKED" if blocked else None}).eq("trading_date",today).execute(); text="PRS blocked" if blocked else "PRS approved"; markup=None
+    payload={"chat_id":settings.TELEGRAM_CHAT_ID,"message_id":message_id,"text":sanitize_telegram_md(text),"parse_mode":"MarkdownV2"}
+    if markup: payload["reply_markup"]={"inline_keyboard":markup}
+    send_telegram_payload(settings.TELEGRAM_BOT_TOKEN,"editMessageText",payload)

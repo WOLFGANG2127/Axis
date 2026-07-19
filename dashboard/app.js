@@ -1,3 +1,14 @@
+/**
+ * app.js — Main dashboard controller for AXIS.
+ *
+ * Revision: Phase 6 + R5 fix.
+ * - Unified honesty-state engine (Supabase Realtime + Netlify health + pipeline staleness)
+ * - Governance panel poll
+ * - Trader session / PRS panel poll
+ * - Macro regime / cross-symbol panel poll
+ * - Shared Realtime channel (signals feed via shared channel)
+ */
+
 let supabase;
 
 function saveConfig() {
@@ -39,16 +50,16 @@ function initApp() {
     const key = localStorage.getItem('SUPABASE_ANON_KEY');
     supabase = window.supabase.createClient(url, key);
     window._axisSupabase = supabase; // expose for strategy widget
-    if (typeof window._onSupabaseReady === 'function') window._onSupabaseReady();
 
-    // 1. Live signals feed via Supabase Realtime
-    supabase
-        .channel('signals-feed')
-        .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'signals' },
-            (payload) => renderNewSignal(payload.new))
-        .subscribe();
-        
+    // ── Shared Realtime channel (R5 fix: subscribe callback feeds honesty state) ──
+    const channel = getSharedChannel(supabase);
+
+    // Also subscribe for live signals feed on the shared channel
+    onSharedChannelEvent({
+        table: 'signals',
+        callback: (_table, row) => renderNewSignal(row),
+    });
+
     // Initial fetch of recent signals to populate feed
     supabase.from('signals')
         .select('*')
@@ -56,29 +67,40 @@ function initApp() {
         .limit(10)
         .then(({ data }) => {
             if (data) {
-                // Reverse to prepend in chronological order so newest is top
                 data.reverse().forEach(renderNewSignal);
             }
         });
 
-    // 2. Per-symbol last-synced indicator
+    // ── Polling cadence: every 60 seconds for all panels ──
     pollHealth();
-    setInterval(pollHealth, 60000);
-
-    // 3. Virtual Portfolios Table
     pollPortfolios();
-    setInterval(pollPortfolios, 60000);
-
-    // 4. Paper Trades Table
     pollPaperTrades();
+    pollGovernance();
+    pollTraderSession();
+    pollMacroRegime();
+    pollNetlifyHealth();
+
+    setInterval(pollHealth, 60000);
+    setInterval(pollPortfolios, 60000);
     setInterval(pollPaperTrades, 60000);
+    setInterval(pollGovernance, 60000);
+    setInterval(pollTraderSession, 60000);
+    setInterval(pollMacroRegime, 60000);
+    setInterval(pollNetlifyHealth, 60000);
+
+    // Update honesty banner every 30s (includes IST market-hours check)
+    updateHonestyUI();
+    setInterval(updateHonestyUI, 30000);
+
+    // Notify strategy widget
+    if (typeof window._onSupabaseReady === 'function') window._onSupabaseReady();
 }
 
 function renderNewSignal(signal) {
     const container = document.getElementById('signals-container');
     const card = document.createElement('div');
     card.className = 'signal-card';
-    
+
     // Parse target recommendation safely
     let recStr = 'No recommendation';
     try {
@@ -87,39 +109,44 @@ function renderNewSignal(signal) {
             recStr = `${conditions.recommended_strike} ${conditions.ce_or_pe || ''} (${conditions.recommended_expiry || ''})`;
         }
     } catch(e) {}
-    
+
     const ev = signal.ev_rupees ? `₹${signal.ev_rupees}` : '--';
-    
+
     card.innerHTML = `
         <div class="signal-header">
             <strong style="color: var(--accent-color)">${signal.symbol}</strong>
             <span style="color: var(--text-muted); font-size: 0.9em">${formatTime(signal.generated_at)}</span>
         </div>
         <div style="margin-bottom: 8px;">
-            <span>${signal.strategy_name}</span> &bull; 
+            <span>${signal.strategy_name}</span> &bull;
             <span class="verdict-${signal.verifier_verdict}">${signal.verifier_verdict || 'PENDING'}</span>
         </div>
         <div style="font-size: 0.9em; color: var(--text-muted)">
             EV: ${ev} | Target: ${recStr}
         </div>
     `;
-    
+
     container.insertBefore(card, container.firstChild);
-    
+
     // Keep only top 50 elements
     while(container.children.length > 50) {
         container.removeChild(container.lastChild);
     }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POLL FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
 async function pollHealth() {
     const { data: summaries } = await supabase
         .from('cycle_summaries')
         .select('symbol, cycle_time')
         .order('cycle_time', { ascending: false });
-        
+
     if (!summaries) return;
-    
+
     // Get newest for each
     const latest = { NIFTY: null, BANKNIFTY: null };
     for (const row of summaries) {
@@ -127,26 +154,34 @@ async function pollHealth() {
             latest[row.symbol] = row;
         }
     }
-    
+
+    let anyStale = false;
     ['NIFTY', 'BANKNIFTY'].forEach(sym => {
         const row = latest[sym];
         const age = timeAgoMinutes(row?.cycle_time);
-        
+
         const dot = document.getElementById(`dot-${sym.toLowerCase()}`);
         const timeSpan = document.getElementById(`time-${sym.toLowerCase()}`);
-        
+
         if (age <= 40) {
-            dot.className = 'dot healthy';
+            if (dot) dot.className = 'dot healthy';
         } else {
-            dot.className = 'dot dead';
+            if (dot) dot.className = 'dot dead';
+            anyStale = true;
         }
-        
+
         if (row) {
-            timeSpan.textContent = `${age}m ago`;
+            if (timeSpan) timeSpan.textContent = `${age}m ago`;
+            // Feed into honesty signals
+            if (sym === 'NIFTY') _honestySignals.niftyAgeMin = age;
+            else _honestySignals.bankniftyAgeMin = age;
         } else {
-            timeSpan.textContent = 'No data';
+            if (timeSpan) timeSpan.textContent = 'No data';
         }
     });
+
+    _honestySignals.pipelineStale = anyStale;
+    updateHonestyUI();
 }
 
 async function pollPortfolios() {
@@ -155,22 +190,22 @@ async function pollPortfolios() {
         .select('*')
         .order('symbol')
         .order('strategy_name');
-        
+
     if (!data) return;
-    
+
     const tbody = document.getElementById('portfolios-tbody');
     tbody.innerHTML = '';
-    
+
     data.forEach(vp => {
         const tr = document.createElement('tr');
         const capital = vp.current_capital || vp.capital || 0;
         const pnl = vp.total_pnl || 0;
         const pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-        
-        const winRate = vp.total_trades > 0 
+
+        const winRate = vp.total_trades > 0
             ? Math.round((vp.winning_trades / vp.total_trades) * 100) + '%'
             : '--';
-            
+
         tr.innerHTML = `
             <td><strong>${vp.symbol}</strong></td>
             <td>${vp.strategy_name}</td>
@@ -189,19 +224,19 @@ async function pollPaperTrades() {
         .select('*, signals(symbol, strategy_name)')
         .order('entry_time', { ascending: false })
         .limit(20);
-        
+
     if (!data) return;
-    
+
     const tbody = document.getElementById('trades-tbody');
     tbody.innerHTML = '';
-    
+
     data.forEach(trade => {
         const tr = document.createElement('tr');
         const pnl = trade.pnl_rupees || 0;
-        const pnlClass = pnl > 0 ? 'pnl-positive' : (pnl < 0 ? 'pnl-negative' : '');
-        
+        const pnlCls = pnl > 0 ? 'pnl-positive' : (pnl < 0 ? 'pnl-negative' : '');
+
         const sig = trade.signals || {};
-        
+
         tr.innerHTML = `
             <td style="font-size: 0.85em; color: var(--text-muted)">
                 ${formatTime(trade.entry_time)} <br> ${formatTime(trade.exit_time)}
@@ -211,13 +246,80 @@ async function pollPaperTrades() {
                 <span style="font-size: 0.85em; color: var(--text-muted)">${sig.strategy_name || '--'}</span>
             </td>
             <td>${trade.status}</td>
-            <td class="${pnlClass}">₹${Number(pnl).toLocaleString()}</td>
+            <td class="${pnlCls}">₹${Number(pnl).toLocaleString()}</td>
             <td style="font-size: 0.85em; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${trade.exit_reason || ''}">
                 ${trade.exit_reason || '--'}
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+// ── Governance Activity ────────────────────────────────────────────────────────
+async function pollGovernance() {
+    const { data } = await supabase
+        .from('governance_actions')
+        .select('timestamp, gate_name, mode, would_block, did_block, reason')
+        .order('timestamp', { ascending: false })
+        .limit(15);
+
+    renderGovernancePanel('governance-container', data);
+}
+
+// ── Trader Session / PRS ───────────────────────────────────────────────────────
+async function pollTraderSession() {
+    // Get today's date in IST
+    const now = new Date();
+    const istStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
+
+    const { data } = await supabase
+        .from('trader_session_state')
+        .select('*')
+        .eq('trading_date', istStr)
+        .order('created_at', { ascending: false });
+
+    renderTraderSessionPanel('prs-container', data);
+}
+
+// ── Macro Regime / Cross-Symbol ────────────────────────────────────────────────
+async function pollMacroRegime() {
+    const { data } = await supabase
+        .from('macro_regime_flags')
+        .select('signal_timestamp, symbol, direction, session_id')
+        .order('signal_timestamp', { ascending: false })
+        .limit(10);
+
+    renderMacroRegimePanel('macro-container', data);
+}
+
+// ── Honesty State UI Update ────────────────────────────────────────────────────
+function updateHonestyUI() {
+    renderHonestyBanner('honesty-banner');
+
+    // Also update the realtime badge in the header
+    const dot = document.getElementById('dot-realtime');
+    const text = document.getElementById('text-realtime');
+    const state = computeHonestyState();
+
+    if (dot && text) {
+        if (state === HONESTY_STATES.DISCONNECTED) {
+            dot.className = 'dot dead';
+            text.textContent = 'Disconnected';
+            text.style.color = 'var(--red)';
+        } else if (state === HONESTY_STATES.STALE) {
+            dot.className = 'dot dead';
+            text.textContent = 'Stale';
+            text.style.color = 'var(--yellow)';
+        } else if (state === HONESTY_STATES.MARKET_CLOSED) {
+            dot.className = 'dot';
+            text.textContent = 'Market Closed';
+            text.style.color = 'var(--text-muted)';
+        } else {
+            dot.className = 'dot healthy';
+            text.textContent = 'Connected';
+            text.style.color = 'var(--green)';
+        }
+    }
 }
 
 checkConfig();
