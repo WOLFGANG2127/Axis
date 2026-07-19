@@ -32,8 +32,8 @@ jobs:
           
       - name: Run No-Trade Day Summary
         env:
-          GOOGLE_API_KEY: "dummy_google_api_key_string"
-          GROQ_API_KEY: "dummy_groq_api_key_string"
+          GOOGLE_API_KEY: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+          GROQ_API_KEY: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
           ZAI_API_KEY: "dummy_zai_api_key_string"
           TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
           TELEGRAM_CHAT_ID: "123456789"
