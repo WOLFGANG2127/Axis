@@ -1,7 +1,7 @@
 name: No-Trade Day Summary
 
 on:
-  workflow_dispatch: # I removed the cron temporarily so we control exactly when this runs
+  workflow_dispatch: 
 
 jobs:
   run-summary:
@@ -9,13 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: SHOW ME THE FILES (Diagnostic)
-        run: |
-          echo "--- WHAT FILES ARE IN THE WORKFLOW FOLDER? ---"
-          ls -la .github/workflows/
-          echo "--- WHAT DOES THIS YAML FILE ACTUALLY LOOK LIKE ON THE SERVER? ---"
-          cat .github/workflows/no_trade_cron.yml
-          
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -30,22 +23,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
+      - name: FORCE INJECT SECRETS TO .ENV FILE
+        run: |
+          echo 'GOOGLE_API_KEY="AIzaSyDummyKey_FormatXyz1234567890"' > .env
+          echo 'GROQ_API_KEY="gsk_dummy_groq_key_abcdefghijklmnopqrstuvwx"' >> .env
+          echo 'ZAI_API_KEY="zai_dummy_key_1234567890abcdef"' >> .env
+          echo 'TELEGRAM_BOT_TOKEN="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"' >> .env
+          echo 'TELEGRAM_CHAT_ID="123456789"' >> .env
+          echo 'TELEGRAM_WEBHOOK_SECRET="dummy_webhook_secret_value_xyz"' >> .env
+          echo 'DHAN_CLIENT_ID="1234567890"' >> .env
+          echo 'DHAN_ACCESS_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_dhan_access_token"' >> .env
+          echo 'DHAN_TOTP_SECRET="JBSWY3DPEHPK3PXP"' >> .env
+          echo 'DHAN_PIN="1234"' >> .env
+          echo 'SUPABASE_URL="https://dummyprojectid.supabase.co"' >> .env
+          echo 'SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_anon_key"' >> .env
+          echo 'SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_service_role_key"' >> .env
+          echo 'AXIS_MONTHLY_EXPIRIES="[]"' >> .env
+          
       - name: Run No-Trade Day Summary
-        env:
-          GOOGLE_API_KEY: "AIzaSyDummyKey_FormatXyz1234567890"
-          GROQ_API_KEY: "gsk_dummy_groq_key_abcdefghijklmnopqrstuvwx"
-          ZAI_API_KEY: "zai_dummy_key_1234567890abcdef"
-          TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-          TELEGRAM_CHAT_ID: "123456789"
-          TELEGRAM_WEBHOOK_SECRET: "dummy_webhook_secret_value_xyz"
-          DHAN_CLIENT_ID: "1234567890"
-          DHAN_ACCESS_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_dhan_access_token_value"
-          DHAN_TOTP_SECRET: "JBSWY3DPEHPK3PXP"
-          DHAN_PIN: "1234"
-          SUPABASE_URL: "https://dummyprojectid.supabase.co"
-          SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_anon_key_value"
-          SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_service_role_key_value"
-          AXIS_MONTHLY_EXPIRIES: "[]"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python src/scheduling/no_trade_summary.py
