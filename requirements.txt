@@ -133,7 +133,7 @@ python-magic-bin==0.4.14; sys_platform == 'win32'
 python-magic>=0.4.27; sys_platform == 'linux'
 python-multipart==0.0.32
 pytokens==0.4.1
-pywin32==312
+pywin32==312; sys_platform == 'win32'
 PyYAML==6.0.3
 rdflib==7.1.4
 realtime==2.31.0
@@ -176,4 +176,4 @@ yarl==1.24.2
 zipp==4.1.0
 zstandard==0.25.0
 scikit-learn==1.9.0
-numpy==2.4.6
+
