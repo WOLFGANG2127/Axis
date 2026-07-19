@@ -1,9 +1,7 @@
 name: No-Trade Day Summary
 
 on:
-  schedule:
-    - cron: '1 10 * * 1-5'
-  workflow_dispatch:
+  workflow_dispatch: # I removed the cron temporarily so we control exactly when this runs
 
 jobs:
   run-summary:
@@ -11,6 +9,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: SHOW ME THE FILES (Diagnostic)
+        run: |
+          echo "--- WHAT FILES ARE IN THE WORKFLOW FOLDER? ---"
+          ls -la .github/workflows/
+          echo "--- WHAT DOES THIS YAML FILE ACTUALLY LOOK LIKE ON THE SERVER? ---"
+          cat .github/workflows/no_trade_cron.yml
+          
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -25,26 +30,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
-      - name: Force generate .env file for Pydantic
-        run: |
-          cat << 'EOF' > .env
-          GOOGLE_API_KEY="dummy_google_api_key_string"
-          GROQ_API_KEY="dummy_groq_api_key_string"
-          ZAI_API_KEY="dummy_zai_api_key_string"
-          TELEGRAM_BOT_TOKEN="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-          TELEGRAM_CHAT_ID="123456789"
-          TELEGRAM_WEBHOOK_SECRET="dummy_webhook_secret_string"
-          DHAN_CLIENT_ID="dummy_dhan_client_id_string"
-          DHAN_ACCESS_TOKEN="dummy_dhan_access_token_string"
-          DHAN_TOTP_SECRET="dummy_dhan_totp_secret_string"
-          DHAN_PIN="123456"
-          SUPABASE_URL="https://dummyarchitecture.supabase.co"
-          SUPABASE_ANON_KEY="dummy_supabase_anon_key_string"
-          SUPABASE_SERVICE_ROLE_KEY="dummy_supabase_service_role_key_string"
-          AXIS_MONTHLY_EXPIRIES="[]"
-          EOF
-          
       - name: Run No-Trade Day Summary
+        env:
+          GOOGLE_API_KEY: "dummy_google_api_key_string"
+          GROQ_API_KEY: "dummy_groq_api_key_string"
+          ZAI_API_KEY: "dummy_zai_api_key_string"
+          TELEGRAM_BOT_TOKEN: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+          TELEGRAM_CHAT_ID: "123456789"
+          TELEGRAM_WEBHOOK_SECRET: "dummy_webhook_secret_string"
+          DHAN_CLIENT_ID: "dummy_dhan_client_id_string"
+          DHAN_ACCESS_TOKEN: "dummy_dhan_access_token_string"
+          DHAN_TOTP_SECRET: "dummy_dhan_totp_secret_string"
+          DHAN_PIN: "123456"
+          SUPABASE_URL: "https://dummyarchitecture.supabase.co"
+          SUPABASE_ANON_KEY: "dummy_supabase_anon_key_string"
+          SUPABASE_SERVICE_ROLE_KEY: "dummy_supabase_service_role_key_string"
+          AXIS_MONTHLY_EXPIRIES: "[]"
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           python src/scheduling/no_trade_summary.py
