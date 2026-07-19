@@ -1,2 +1,0 @@
-﻿-- 013_intentional_skip.sql
--- Formal intentional sequence marker. No schema operation is required for 013.
