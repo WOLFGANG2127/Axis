@@ -9,29 +9,7 @@
  * - Shared Realtime channel (signals feed via shared channel)
  */
 
-let supabase;
-
-function saveConfig() {
-    const url = document.getElementById('input-url').value.trim();
-    const key = document.getElementById('input-key').value.trim();
-    if (url && key) {
-        localStorage.setItem('SUPABASE_URL', url);
-        localStorage.setItem('SUPABASE_ANON_KEY', key);
-        document.getElementById('config-modal').style.display = 'none';
-        initApp();
-    }
-}
-
-function checkConfig() {
-    const url = localStorage.getItem('SUPABASE_URL');
-    const key = localStorage.getItem('SUPABASE_ANON_KEY');
-    if (url && key) {
-        document.getElementById('config-modal').style.display = 'none';
-        document.getElementById('input-url').value = url;
-        document.getElementById('input-key').value = key;
-        initApp();
-    }
-}
+window.initApp = initApp; // Make it globally accessible for shared.js fallback
 
 function formatTime(isoString) {
     if (!isoString) return '--';
@@ -46,13 +24,10 @@ function timeAgoMinutes(isoString) {
 }
 
 function initApp() {
-    const url = localStorage.getItem('SUPABASE_URL');
-    const key = localStorage.getItem('SUPABASE_ANON_KEY');
-    supabase = window.supabase.createClient(url, key);
-    window._axisSupabase = supabase; // expose for strategy widget
+    window._axisSupabase = getSupabase(); // expose for strategy widget
 
     // ── Shared Realtime channel (R5 fix: subscribe callback feeds honesty state) ──
-    const channel = getSharedChannel(supabase);
+    const channel = getSharedChannel(window._axisSupabase);
 
     // Also subscribe for live signals feed on the shared channel
     onSharedChannelEvent({
@@ -61,7 +36,7 @@ function initApp() {
     });
 
     // Initial fetch of recent signals to populate feed
-    supabase.from('signals')
+    window._axisSupabase.from('signals')
         .select('*')
         .order('generated_at', { ascending: false })
         .limit(10)
@@ -140,7 +115,7 @@ function renderNewSignal(signal) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function pollHealth() {
-    const { data: summaries } = await supabase
+    const { data: summaries } = await window._axisSupabase
         .from('cycle_summaries')
         .select('symbol, cycle_time')
         .order('cycle_time', { ascending: false });
@@ -163,7 +138,7 @@ async function pollHealth() {
         const dot = document.getElementById(`dot-${sym.toLowerCase()}`);
         const timeSpan = document.getElementById(`time-${sym.toLowerCase()}`);
 
-        if (age <= 40) {
+        if (age <= 10) {
             if (dot) dot.className = 'dot healthy';
         } else {
             if (dot) dot.className = 'dot dead';
@@ -185,7 +160,7 @@ async function pollHealth() {
 }
 
 async function pollPortfolios() {
-    const { data } = await supabase
+    const { data } = await window._axisSupabase
         .from('virtual_portfolios')
         .select('*')
         .order('symbol')
@@ -219,7 +194,7 @@ async function pollPortfolios() {
 
 async function pollPaperTrades() {
     // Join paper_trades with signals to get symbol and strategy_name
-    const { data } = await supabase
+    const { data } = await window._axisSupabase
         .from('paper_trades')
         .select('*, signals(symbol, strategy_name)')
         .order('entry_time', { ascending: false })
@@ -257,7 +232,7 @@ async function pollPaperTrades() {
 
 // ── Governance Activity ────────────────────────────────────────────────────────
 async function pollGovernance() {
-    const { data } = await supabase
+    const { data } = await window._axisSupabase
         .from('governance_actions')
         .select('timestamp, gate_name, mode, would_block, did_block, reason')
         .order('timestamp', { ascending: false })
@@ -272,7 +247,7 @@ async function pollTraderSession() {
     const now = new Date();
     const istStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
 
-    const { data } = await supabase
+    const { data } = await window._axisSupabase
         .from('trader_session_state')
         .select('*')
         .eq('trading_date', istStr)
@@ -283,7 +258,7 @@ async function pollTraderSession() {
 
 // ── Macro Regime / Cross-Symbol ────────────────────────────────────────────────
 async function pollMacroRegime() {
-    const { data } = await supabase
+    const { data } = await window._axisSupabase
         .from('macro_regime_flags')
         .select('signal_timestamp, symbol, direction, session_id')
         .order('signal_timestamp', { ascending: false })
@@ -322,4 +297,4 @@ function updateHonestyUI() {
     }
 }
 
-checkConfig();
+checkAndBootstrap(initApp);
