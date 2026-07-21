@@ -1,0 +1,15 @@
+{
+  "name": "axis-remastered",
+  "version": "1.0.0",
+  "description": "AXIS Dashboard and Netlify Functions",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

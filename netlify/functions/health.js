@@ -1,18 +1,18 @@
 exports.handler = async function(event, context) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-        return { statusCode: 500, body: JSON.stringify({ error: 'Missing environment variables' }) };
-    }
-    
-    const headers = {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json'
-    };
-    
     try {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+            throw new Error('Missing environment variables: SUPABASE_URL or SUPABASE_ANON_KEY');
+        }
+        
+        const headers = {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
+        };
+        
         // Fetch most recent cycle_time for NIFTY
         const niftyReq = fetch(`${supabaseUrl}/rest/v1/cycle_summaries?symbol=eq.NIFTY&select=cycle_time&order=cycle_time.desc&limit=1`, { headers });
         // Fetch most recent cycle_time for BANKNIFTY
@@ -21,7 +21,7 @@ exports.handler = async function(event, context) {
         const [niftyRes, bankNiftyRes] = await Promise.all([niftyReq, bankNiftyReq]);
         
         if (!niftyRes.ok || !bankNiftyRes.ok) {
-            return { statusCode: 500, body: JSON.stringify({ error: 'Database query failed' }) };
+            throw new Error('Database query failed with non-200 response');
         }
         
         const niftyData = await niftyRes.json();
@@ -69,6 +69,13 @@ exports.handler = async function(event, context) {
             }) 
         };
     } catch (error) {
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+        return { 
+            statusCode: 200, 
+            body: JSON.stringify({ 
+                status: "stale", 
+                error: "Fatal function crash", 
+                details: error.message 
+            }) 
+        };
     }
 };
