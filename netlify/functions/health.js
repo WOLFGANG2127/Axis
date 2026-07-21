@@ -31,7 +31,15 @@ exports.handler = async function(event, context) {
         const bankNiftyRow = bankNiftyData[0];
         
         if (!niftyRow || !bankNiftyRow) {
-            return { statusCode: 503, body: JSON.stringify({ error: 'Missing cycle_summaries for one or both symbols' }) };
+            return { 
+                statusCode: 200, 
+                body: JSON.stringify({ 
+                    status: 'stale', 
+                    error: 'Missing cycle_summaries for one or both symbols',
+                    nifty_age_minutes: Infinity,
+                    banknifty_age_minutes: Infinity
+                }) 
+            };
         }
         
         const now = new Date();
