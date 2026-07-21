@@ -41,11 +41,11 @@ exports.handler = async function(event, context) {
         const niftyAgeMinutes = (now - niftyTime) / (1000 * 60);
         const bankNiftyAgeMinutes = (now - bankNiftyTime) / (1000 * 60);
         
-        if (niftyAgeMinutes > 40 || bankNiftyAgeMinutes > 40) {
+        if (niftyAgeMinutes > 10 || bankNiftyAgeMinutes > 10) {
             return { 
-                statusCode: 503, 
+                statusCode: 200, 
                 body: JSON.stringify({
-                    status: 'dead',
+                    status: 'stale',
                     nifty_age_minutes: niftyAgeMinutes,
                     banknifty_age_minutes: bankNiftyAgeMinutes
                 }) 
