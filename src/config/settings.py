@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import Field, HttpUrl, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,7 +16,13 @@ ENV_FILE = Path(_env_override) if _env_override else PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
-    """Validated environment configuration for AXIS."""
+    """Validated environment configuration for AXIS.
+
+    Every field has a default so that ``settings`` can be imported safely
+    in CI/CD workflows and isolated scripts without a full ``.env`` file.
+    Use ``settings.require(...)`` at runtime to assert that the keys your
+    code actually needs are present and non-empty.
+    """
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
@@ -25,21 +31,32 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
 
-    GOOGLE_API_KEY: str = Field(min_length=1)
-    GROQ_API_KEY: str = Field(min_length=1)
-    ZAI_API_KEY: str = Field(min_length=1)
-    TELEGRAM_BOT_TOKEN: str = Field(min_length=1)
-    TELEGRAM_CHAT_ID: str = Field(min_length=1)
-    TELEGRAM_WEBHOOK_SECRET: str = Field(min_length=1)
-    DHAN_CLIENT_ID: str = Field(min_length=1)
+    # --- AI / LLM keys ---
+    GOOGLE_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    ZAI_API_KEY: str = ""
+
+    # --- Telegram ---
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""
+    TELEGRAM_WEBHOOK_SECRET: str = ""
+
+    # --- Dhan broker ---
+    DHAN_CLIENT_ID: str = ""
     DHAN_ACCESS_TOKEN: str = ""
-    DHAN_TOTP_SECRET: str = Field(min_length=1)
-    DHAN_PIN: str = Field(min_length=1)
-    SUPABASE_URL: HttpUrl
-    SUPABASE_ANON_KEY: str = Field(min_length=1)
-    SUPABASE_SERVICE_ROLE_KEY: str = Field(min_length=1)
-    
+    DHAN_TOTP_SECRET: str = ""
+    DHAN_PIN: str = ""
+
+    # --- Supabase ---
+    SUPABASE_URL: Optional[str] = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+
+    # --- Governance ---
     GOVERNANCE_DAILY_LOSS_MODE: str = "SHADOW"
+
+    # --- Trading calendar ---
+    AXIS_MONTHLY_EXPIRIES: str = ""
 
     @field_validator("TELEGRAM_CHAT_ID", mode="before")
     @classmethod
@@ -48,9 +65,20 @@ class Settings(BaseSettings):
             return value
         return str(value).strip()
 
+    # ------------------------------------------------------------------
+    # Runtime validation helpers
+    # ------------------------------------------------------------------
 
-    def validate_for(self, *keys: str) -> None:
-        """Ensure the named settings exist and are non-empty."""
+    def require(self, *keys: str) -> None:
+        """Assert that *keys* are present and non-empty.
+
+        Call this at the top of any function / script that genuinely needs
+        specific credentials, rather than relying on import-time checks.
+
+        Example::
+
+            settings.require("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY")
+        """
         missing: list[str] = []
         for key in keys:
             if not hasattr(self, key):
@@ -63,6 +91,9 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Missing or empty required settings: " + ", ".join(missing)
             )
+
+    # Keep legacy alias so existing callers still work.
+    validate_for = require
 
 
 def _load_settings() -> Settings:
@@ -81,4 +112,3 @@ def _load_settings() -> Settings:
 
 
 settings = _load_settings()
-

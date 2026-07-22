@@ -6,6 +6,22 @@ on:
 jobs:
   run-summary:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+      DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+      DHAN_TOTP_SECRET: ${{ secrets.DHAN_TOTP_SECRET }}
+      DHAN_PIN: ${{ secrets.DHAN_PIN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      AXIS_MONTHLY_EXPIRIES: ${{ secrets.AXIS_MONTHLY_EXPIRIES }}
     steps:
       - uses: actions/checkout@v4
       
@@ -22,23 +38,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          
-      - name: FORCE INJECT SECRETS TO .ENV FILE
-        run: |
-          echo 'GOOGLE_API_KEY="AIzaSyDummyKey_FormatXyz1234567890"' > .env
-          echo 'GROQ_API_KEY="gsk_dummy_groq_key_abcdefghijklmnopqrstuvwx"' >> .env
-          echo 'ZAI_API_KEY="zai_dummy_key_1234567890abcdef"' >> .env
-          echo 'TELEGRAM_BOT_TOKEN="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"' >> .env
-          echo 'TELEGRAM_CHAT_ID="123456789"' >> .env
-          echo 'TELEGRAM_WEBHOOK_SECRET="dummy_webhook_secret_value_xyz"' >> .env
-          echo 'DHAN_CLIENT_ID="1234567890"' >> .env
-          echo 'DHAN_ACCESS_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_dhan_access_token"' >> .env
-          echo 'DHAN_TOTP_SECRET="JBSWY3DPEHPK3PXP"' >> .env
-          echo 'DHAN_PIN="1234"' >> .env
-          echo 'SUPABASE_URL="https://dummyprojectid.supabase.co"' >> .env
-          echo 'SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_anon_key"' >> .env
-          echo 'SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_supabase_service_role_key"' >> .env
-          echo 'AXIS_MONTHLY_EXPIRIES="[]"' >> .env
           
       - name: Run No-Trade Day Summary
         run: |
