@@ -48,6 +48,13 @@ class Settings(BaseSettings):
             return value
         return str(value).strip()
 
+    @field_validator("DHAN_ACCESS_TOKEN", mode="before")
+    @classmethod
+    def _mock_dhan_access_token(cls, value: Any) -> Any:
+        if not value or (isinstance(value, str) and not value.strip()):
+            return "MOCK_TOKEN_FOR_REFRESH"
+        return value
+
     def validate_for(self, *keys: str) -> None:
         """Ensure the named settings exist and are non-empty."""
         missing: list[str] = []
