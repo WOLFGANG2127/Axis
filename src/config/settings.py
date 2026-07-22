@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = Field(min_length=1)
     TELEGRAM_WEBHOOK_SECRET: str = Field(min_length=1)
     DHAN_CLIENT_ID: str = Field(min_length=1)
-    DHAN_ACCESS_TOKEN: str = Field(min_length=1)
+    DHAN_ACCESS_TOKEN: str = ""
     DHAN_TOTP_SECRET: str = Field(min_length=1)
     DHAN_PIN: str = Field(min_length=1)
     SUPABASE_URL: HttpUrl
@@ -48,12 +48,6 @@ class Settings(BaseSettings):
             return value
         return str(value).strip()
 
-    @field_validator("DHAN_ACCESS_TOKEN", mode="before")
-    @classmethod
-    def _mock_dhan_access_token(cls, value: Any) -> Any:
-        if not value or (isinstance(value, str) and not value.strip()):
-            return "MOCK_TOKEN_FOR_REFRESH"
-        return value
 
     def validate_for(self, *keys: str) -> None:
         """Ensure the named settings exist and are non-empty."""
