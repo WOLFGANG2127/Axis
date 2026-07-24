@@ -26,6 +26,9 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
         
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -39,6 +42,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Verify Checked Out Code
+        run: |
+          echo "=== Current Commit ==="
+          git log -1 --oneline
+          echo "=== Auth Fix Verification ==="
+          python -c "
+          with open('src/data/dhan_client.py') as f:
+              text = f.read()
+          print('params= present:', 'params=' in text)
+          print('status_code >= 400 present:', 'status_code >= 400' in text)
+          lines = text.splitlines()
+          for i, line in enumerate(lines[130:150], start=131):
+              print(f'{i}: {line}')
+          "
           
       - name: Run Token Refresher
         run: |
