@@ -130,6 +130,16 @@ def _underlying(symbol: str) -> dict[str, Any]:
 
 
 def _raise_for_api_error(response: httpx.Response) -> None:
+    if response.status_code >= 400:
+        error_body = response.text
+        try:
+            payload = response.json()
+            error_code = payload.get("errorCode", "")
+            error_msg = payload.get("errorMessage") or payload.get("message") or error_body
+            detail = f"[{error_code}] {error_msg}" if error_code else error_msg
+        except Exception:
+            detail = error_body
+        raise RuntimeError(f"Dhan API Error {response.status_code}: {detail}")
     response.raise_for_status()
     payload = response.json()
     if isinstance(payload, dict) and payload.get("errorCode"):
@@ -315,8 +325,8 @@ def generate_access_token(
     try:
         response = active_client.post(
             DHAN_AUTH_API,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
-            json={
+            headers={"Accept": "application/json"},
+            params={
                 "dhanClientId": settings.DHAN_CLIENT_ID,
                 "pin": pin,
                 "totp": totp,
