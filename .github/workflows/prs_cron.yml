@@ -5,6 +5,12 @@ on:
     # 03:00 UTC is 08:30 (8:30 AM) IST every weekday
     - cron: '0 3 * * 1-5'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/scheduling/prs_quiz.py'
+      - 'src/config/settings.py'
+      - '.github/workflows/**'
 
 jobs:
   run-prs:
