@@ -53,6 +53,7 @@ function initApp() {
     pollGovernance();
     pollTraderSession();
     pollMacroRegime();
+    pollStrategyLeaderboard();
     pollNetlifyHealth();
 
     setInterval(pollHealth, 60000);
@@ -61,6 +62,7 @@ function initApp() {
     setInterval(pollGovernance, 60000);
     setInterval(pollTraderSession, 60000);
     setInterval(pollMacroRegime, 60000);
+    setInterval(pollStrategyLeaderboard, 60000);
     setInterval(pollNetlifyHealth, 60000);
 
     // Update honesty banner every 30s (includes IST market-hours check)
@@ -265,6 +267,35 @@ async function pollMacroRegime() {
         .limit(10);
 
     renderMacroRegimePanel('macro-container', data);
+}
+
+// ── Strategy Leaderboard ───────────────────────────────────────────────────────
+async function pollStrategyLeaderboard() {
+    const container = document.getElementById('strategy-widget-container');
+    if (!container) return;
+
+    try {
+        const { data, error } = await window._axisSupabase
+            .from('strategies')
+            .select('*')
+            .eq('status', 'active');
+
+        if (error || !data || data.length === 0) {
+            container.innerHTML = '<div class="text-sm text-gray-400 p-4 text-center">No active strategies found</div>';
+            return;
+        }
+
+        let html = '';
+        data.forEach(s => {
+            html += `<div style="padding:10px 0;border-bottom:1px solid var(--border,#334155);font-size:.82rem;display:flex;justify-content:space-between;align-items:center;">
+                <strong>${s.name || s.id}</strong>
+                <span style="color:var(--green,#10b981);font-weight:600">Active</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<div class="text-sm text-gray-400 p-4 text-center">No active strategies found</div>';
+    }
 }
 
 // ── Honesty State UI Update ────────────────────────────────────────────────────
