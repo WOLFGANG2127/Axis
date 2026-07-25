@@ -134,7 +134,7 @@ const MIN_SAMPLE_FLOOR = 15;
 //   3. Pipeline staleness (cycle_summaries age > 40 min)
 //
 // Priority (highest wins):
-//   DISCONNECTED > STALE > MARKET_CLOSED > HEALTHY
+//   DISCONNECTED > MARKET_CLOSED > STALE > HEALTHY
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const HONESTY_STATES = {
@@ -174,13 +174,13 @@ function computeHonestyState() {
     if (!_honestySignals.realtimeConnected || !_honestySignals.netlifyHealthy) {
         return HONESTY_STATES.DISCONNECTED;
     }
-    // Pipeline data is stale → STALE
-    if (_honestySignals.pipelineStale) {
-        return HONESTY_STATES.STALE;
-    }
     // Outside market hours → MARKET_CLOSED
     if (!isMarketOpen()) {
         return HONESTY_STATES.MARKET_CLOSED;
+    }
+    // Pipeline data is stale → STALE
+    if (_honestySignals.pipelineStale) {
+        return HONESTY_STATES.STALE;
     }
     return HONESTY_STATES.HEALTHY;
 }

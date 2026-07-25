@@ -151,7 +151,7 @@ async function pollHealth() {
             if (sym === 'NIFTY') _honestySignals.niftyAgeMin = age;
             else _honestySignals.bankniftyAgeMin = age;
         } else {
-            if (timeSpan) timeSpan.textContent = 'No data';
+            if (timeSpan) timeSpan.textContent = isMarketOpen() ? 'No data' : 'Closed';
         }
     });
 
