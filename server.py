@@ -11,6 +11,7 @@ subprocess.Popen([sys.executable, "-m", "src.scheduling.no_trade_summary"])
 def home():
     return {"status": "AXIS backend pipeline is actively executing in the background."}
 
+@app.head("/api/health")
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
