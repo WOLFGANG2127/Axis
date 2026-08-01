@@ -1,0 +1,67 @@
+﻿{
+  "status": "success",
+  "data": {
+    "exchange_timestamp": "2026-08-02T09:17:05+05:30",
+    "underlying": {
+      "symbol": "NIFTY",
+      "ltp": 24512.50,
+      "change": 85.30
+    },
+    "optionChains": [
+      {
+        "strike_price": 24400.0,
+        "call_options": [
+          {
+            "strike_price": 24400.0,
+            "ltp": 215.60,
+            "oi": 1254000,
+            "volume": 45200,
+            "iv": 13.25,
+            "gamma": 0.0008,
+            "bid_price": 215.10,
+            "ask_price": 216.05
+          }
+        ],
+        "put_options": [
+          {
+            "strike_price": 24400.0,
+            "ltp": 112.30,
+            "oi": 2100300,
+            "volume": 32100,
+            "iv": 14.10,
+            "gamma": 0.0009,
+            "bid_price": 111.85,
+            "ask_price": 112.70
+          }
+        ]
+      },
+      {
+        "strike_price": 24500.0,
+        "call_options": [
+          {
+            "strike_price": 24500.0,
+            "ltp": 145.25,
+            "oi": 3400200,
+            "volume": 88500,
+            "iv": 12.90,
+            "gamma": 0.0011,
+            "bid_price": 144.80,
+            "ask_price": 145.65
+          }
+        ],
+        "put_options": [
+          {
+            "strike_price": 24500.0,
+            "ltp": 155.80,
+            "oi": 1890000,
+            "volume": 41200,
+            "iv": 13.50,
+            "gamma": 0.0012,
+            "bid_price": 155.30,
+            "ask_price": 156.15
+          }
+        ]
+      }
+    ]
+  }
+}

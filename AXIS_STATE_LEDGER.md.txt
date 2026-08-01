@@ -1,0 +1,37 @@
+# AXIS SHARED MEMORY & STATE LEDGER
+**Mandatory Rule for All Agents:** You must read this file before starting any task. You must update this file when you take a task, finish a task, or move it to QA.
+
+## 1. ACTIVE BLUEPRINT & PHASE
+* Reference: `@AXIS_MASTER_v11.md`
+* Current Phase: Phase 0 (Crash Fixes & D-001)
+* Phase Exit Criteria: D-001 confirmed fixed, and all verification commands for D-004, D-005, D-007, D-009, D-010, D-055 return passing output.
+
+## 2. FILE LOCKS (Do not edit these files if another Agent has them)
+* [Empty - e.g., `src/main.py` (Locked by Agent 1)]
+
+## 3. DATABASE MIGRATION STATE
+* Core Tier Tables (`signals`, `active_position`, `system_paused`, `telegram_updates_processed`): 🔴 NOT VERIFIED IN SUPABASE
+* Extended Tier Tables: 🔴 NONE APPLIED
+
+## 4. TASK BOARD
+### 🔴 TODO
+* D-001: Fix scoring pipeline wiring (Step-3 data-orchestration)
+* D-004: Replace PRS with /ready command
+* D-005: Define _log in nodes.py
+* D-007: Build ohlc_writer.py
+* D-009: Wire crash alerting in main.py
+* D-010: Fix Procfile to target server:app
+* D-055: Build inbound webhook endpoint
+
+### 🟡 IN PROGRESS
+* [Empty - e.g., D-001 (Assigned to: Agent 1)]
+
+### 🟣 PENDING QA (Awaiting Agent 5 or 6)
+* [Empty]
+
+### 🟢 DONE (Verified by QA)
+* CBM Graph Engine Installed & Indexed
+
+## 5. AGENT COMMUNICATOR & QA REJECTS
+* [Leave notes or QA feedback here]
+* Format: [To Agent X from Agent Y]: Message.
