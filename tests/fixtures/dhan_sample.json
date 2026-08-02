@@ -1,67 +1,76 @@
 ﻿{
-  "status": "success",
   "data": {
-    "exchange_timestamp": "2026-08-02T09:17:05+05:30",
-    "underlying": {
-      "symbol": "NIFTY",
-      "ltp": 24512.50,
-      "change": 85.30
-    },
-    "optionChains": [
-      {
-        "strike_price": 24400.0,
-        "call_options": [
-          {
-            "strike_price": 24400.0,
-            "ltp": 215.60,
-            "oi": 1254000,
-            "volume": 45200,
-            "iv": 13.25,
-            "gamma": 0.0008,
-            "bid_price": 215.10,
-            "ask_price": 216.05
-          }
-        ],
-        "put_options": [
-          {
-            "strike_price": 24400.0,
-            "ltp": 112.30,
-            "oi": 2100300,
-            "volume": 32100,
-            "iv": 14.10,
-            "gamma": 0.0009,
-            "bid_price": 111.85,
-            "ask_price": 112.70
-          }
-        ]
+    "last_price": 24512.50,
+    "oc": {
+      "24400.000000": {
+        "ce": {
+          "average_price": 215.60,
+          "last_price": 215.60,
+          "oi": 1254000,
+          "previous_close_price": 210.10,
+          "previous_oi": 1180000,
+          "previous_volume": 39800,
+          "security_id": 49103,
+          "top_ask_price": 216.05,
+          "top_ask_quantity": 300,
+          "top_bid_price": 215.10,
+          "top_bid_quantity": 250,
+          "volume": 45200,
+          "implied_volatility": 13.25,
+          "greeks": { "delta": 0.612, "theta": -8.42, "gamma": 0.0008, "vega": 9.15 }
+        },
+        "pe": {
+          "average_price": 112.30,
+          "last_price": 112.30,
+          "oi": 2100300,
+          "previous_close_price": 118.00,
+          "previous_oi": 2050000,
+          "previous_volume": 30500,
+          "security_id": 49104,
+          "top_ask_price": 112.70,
+          "top_ask_quantity": 400,
+          "top_bid_price": 111.85,
+          "top_bid_quantity": 350,
+          "volume": 32100,
+          "implied_volatility": 14.10,
+          "greeks": { "delta": -0.388, "theta": -7.90, "gamma": 0.0009, "vega": 9.05 }
+        }
       },
-      {
-        "strike_price": 24500.0,
-        "call_options": [
-          {
-            "strike_price": 24500.0,
-            "ltp": 145.25,
-            "oi": 3400200,
-            "volume": 88500,
-            "iv": 12.90,
-            "gamma": 0.0011,
-            "bid_price": 144.80,
-            "ask_price": 145.65
-          }
-        ],
-        "put_options": [
-          {
-            "strike_price": 24500.0,
-            "ltp": 155.80,
-            "oi": 1890000,
-            "volume": 41200,
-            "iv": 13.50,
-            "gamma": 0.0012,
-            "bid_price": 155.30,
-            "ask_price": 156.15
-          }
-        ]
+      "24500.000000": {
+        "ce": {
+          "average_price": 145.25,
+          "last_price": 145.25,
+          "oi": 3400200,
+          "previous_close_price": 138.00,
+          "previous_oi": 3250000,
+          "previous_volume": 79000,
+          "security_id": 49105,
+          "top_ask_price": 145.65,
+          "top_ask_quantity": 280,
+          "top_bid_price": 144.80,
+          "top_bid_quantity": 320,
+          "volume": 88500,
+          "implied_volatility": 12.90,
+          "greeks": { "delta": 0.481, "theta": -9.10, "gamma": 0.0011, "vega": 10.02 }
+        },
+        "pe": {
+          "average_price": 155.80,
+          "last_price": 155.80,
+          "oi": 1890000,
+          "previous_close_price": 161.50,
+          "previous_oi": 1820000,
+          "previous_volume": 38200,
+          "security_id": 49106,
+          "top_ask_price": 156.15,
+          "top_ask_quantity": 310,
+          "top_bid_price": 155.30,
+          "top_bid_quantity": 290,
+          "volume": 41200,
+          "implied_volatility": 13.50,
+          "greeks": { "delta": -0.512, "theta": -8.85, "gamma": 0.0012, "vega": 9.88 }
+        }
       }
-    ]
-  }
+    }
+  },
+  "status": "success"
 }
