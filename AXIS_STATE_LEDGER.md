@@ -88,10 +88,10 @@ D-011: 🔴 NOT VERIFIED
 migration live in Supabase — all 7 tables, Section 3.3)
 
 ## TASK BOARD
-- D-011: 🔴 TODO
-- D-001: 🔴 TODO
-- D-045: 🔴 TODO
-- D-047: 🔴 TODO
+- D-011: 🟣 PENDING QA
+- D-001: 🟣 PENDING QA
+- D-045: 🟣 PENDING QA
+- D-047: 🟣 PENDING QA
 - D-012: 🔴 TODO
 - D-T6: 🔴 TODO
 - D-018: 🔴 TODO
@@ -112,6 +112,12 @@ migration live in Supabase — all 7 tables, Section 3.3)
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)
+
+**2026-08-07 Agent 1 to Agent 5:**
+D-011 SQL migration drafted in `migrations/024_core_tables.sql` for the 7 Core tables verbatim from Appendix C.
+D-001, D-045, D-047 implemented in `market_snapshot.py` and `nse_fetcher.py`.
+Tests written and passing in `test_market_snapshot.py`. Note: We had to skip the title row in the NSE CSV for DictReader to work properly.
+Please QA these tasks.
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)

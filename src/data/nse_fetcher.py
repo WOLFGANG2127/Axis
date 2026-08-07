@@ -1,4 +1,8 @@
-"""Read-only NSE option-chain and participant-OI fetchers."""
+"""Read-only NSE option-chain and participant-OI fetchers.
+
+D-047: classify a 403 status or HTML response body as NSE_BLOCKED,
+       distinct from an empty-but-200 NSE_EMPTY response.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +21,10 @@ NSE_HOME = "https://www.nseindia.com"
 NSE_OPTION_CHAIN = f"{NSE_HOME}/api/option-chain-indices"
 NSE_PARTICIPANT_OI = "https://archives.nseindia.com/content/nsccl/fao_participant_oi_{stamp}.csv"
 TrustStatus = Literal["live", "stale", "demo-fallback"]
+
+# D-047: fetch outcome classifications distinct from trust_status above.
+FetchStatus = Literal["OK", "NSE_BLOCKED", "NSE_EMPTY", "ERROR"]
+
 _HEADERS = {
     "Accept": "application/json,text/plain,*/*",
     "Accept-Language": "en-US,en;q=0.9",
@@ -37,6 +45,17 @@ def _envelope(data: Any, trust_status: TrustStatus = "live") -> dict[str, Any]:
     }
 
 
+def _is_html_response(text: str) -> bool:
+    """Detect an HTML gate/block page returned with a 200 status.
+
+    NSE sometimes returns an HTML Cloudflare/WAF challenge page with HTTP 200
+    instead of a proper JSON payload. This is distinct from a genuine empty
+    response (NSE_EMPTY) and must be classified as NSE_BLOCKED (D-047).
+    """
+    stripped = text.lstrip()
+    return stripped.startswith("<") or "<!DOCTYPE" in text[:100] or "<html" in text[:200].lower()
+
+
 def fetch_option_chain(
     symbol: str,
     *,
@@ -51,10 +70,30 @@ def fetch_option_chain(
     try:
         active_client.get(f"{NSE_HOME}/option-chain").raise_for_status()
         response = active_client.get(NSE_OPTION_CHAIN, params={"symbol": normalized})
+
+        # D-047: classify 403 as NSE_BLOCKED immediately
+        if response.status_code == 403:
+            return _envelope(
+                {"source": "nse", "fetch_status": "NSE_BLOCKED", "records": None},
+                "stale",
+            )
+
         if response.status_code == 200:
+            # D-047: classify HTML responses (Cloudflare/WAF pages at 200) as NSE_BLOCKED
+            if _is_html_response(response.text):
+                return _envelope(
+                    {"source": "nse", "fetch_status": "NSE_BLOCKED", "records": None},
+                    "stale",
+                )
             payload = response.json()
             if payload.get("records"):
                 return _envelope(payload)
+            # 200 with valid JSON but no records -- NSE_EMPTY, not NSE_BLOCKED
+            return _envelope(
+                {"source": "nse", "fetch_status": "NSE_EMPTY", "records": None},
+                "stale",
+            )
+
         # NSE retired/disabled its legacy JSON route in some regions in 2026.
         # Dhan is the authenticated, read-only live fallback already authorized
         # by this project; preserve source metadata so quality checks can see it.
@@ -94,6 +133,8 @@ def fetch_participant_oi(
 
     A missing archive on an exchange holiday is treated as another signal to
     walk backward, which protects Monday/pre-market runs from the T+1 trap.
+
+    D-047: classify a 403 status as NSE_BLOCKED (distinct from NSE_EMPTY).
     """
     owns_client = client is None
     active_client = client or httpx.Client(headers=_HEADERS, timeout=20.0, follow_redirects=True)
@@ -103,6 +144,15 @@ def fetch_participant_oi(
         while attempts < max_lookback:
             url = NSE_PARTICIPANT_OI.format(stamp=candidate.strftime("%d%m%Y"))
             response = active_client.get(url)
+
+            # D-047: 403 is a hard block, not a missing file -- classify explicitly
+            if response.status_code == 403:
+                raise RuntimeError(
+                    f"NSE_BLOCKED: participant OI endpoint returned 403 for {candidate}. "
+                    "NSE is actively blocking this request (IP/rate-limit/WAF). "
+                    "Do not retry without intervention."
+                )
+
             if response.status_code == 200 and "Client Type" in response.text:
                 return _envelope({"csv_text": response.text, "fii_data_date": candidate.isoformat()})
             candidate = previous_trading_day(candidate, holidays=holidays)
@@ -129,7 +179,14 @@ def _ratio(long_value: float, short_value: float) -> float:
 def compute_long_short_ratio(csv_text: str) -> dict[str, Any]:
     """Compute FII futures/calls/puts ratios separately from NSE CSV text."""
     cleaned = csv_text.lstrip("\ufeff").strip()
-    rows = list(csv.DictReader(io.StringIO(cleaned)))
+    lines = cleaned.splitlines()
+    header_idx = next((i for i, line in enumerate(lines) if "Client Type" in line), None)
+    if header_idx is None:
+        raise ValueError("participant OI CSV contains no header row with 'Client Type'")
+    
+    csv_body = "\n".join(lines[header_idx:])
+    rows = list(csv.DictReader(io.StringIO(csv_body)))
+    
     fii = next(
         (row for row in rows if (row.get("Client Type") or row.get("client type") or "").strip().upper() == "FII"),
         None,

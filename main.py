@@ -14,6 +14,16 @@ from src.scheduling.calendar_gate import is_market_open, is_system_paused
 from src.scheduling.lock_manager import acquire_run_lock, release_run_lock
 from src.scheduling.prs_gate import check_prs_trading_gate
 
+# D-001: import the scoring pipeline (wired into run_cycle/run_all_symbols_cycle)
+# [Agent 1 change]: previously market_context used a static direction_score=3 default;
+# now it is populated with the live result of fetch_and_score_market_data().
+try:
+    from src.data.market_snapshot import fetch_and_score_market_data, StaleDataError
+    _SCORING_AVAILABLE = True
+except ImportError:
+    _SCORING_AVAILABLE = False
+    StaleDataError = RuntimeError  # type: ignore[misc,assignment]
+
 IST = ZoneInfo("Asia/Kolkata")
 VALID_SYMBOLS = ("NIFTY", "BANKNIFTY")
 
@@ -222,12 +232,38 @@ async def run_cycle(
 
     correlation_id = new_correlation_id()
     try:
+        # [Agent 1 — D-001]: Fetch and score live market data before building the graph state.
+        # Previously market_context was seeded with direction_score=3 (static default) and
+        # score_layer_a/b/c were never called during a live cycle. This wires the pipeline.
+        context = _base_market_context(current, lock_acquired=True)
+        cycle_errors: list[dict[str, Any]] = []
+        if _SCORING_AVAILABLE:
+            try:
+                scored = fetch_and_score_market_data(
+                    normalized,
+                    _cycle_errors=cycle_errors,
+                )
+                context["direction_score"] = scored.direction_score
+                context["layer_a"] = scored.layer_a
+                context["layer_b"] = scored.layer_b
+                context["layer_c"] = scored.layer_c
+                context["last_price"] = scored.last_price
+                context["fii_fetch_failed"] = scored.fii_fetch_failed
+                context["scoring_errors"] = cycle_errors
+            except StaleDataError as exc:
+                return {"status": "STALE_DATA", "symbol": normalized, "reason": str(exc)}
+            except Exception as exc:
+                import logging
+                logging.getLogger("axis.main").warning(
+                    "fetch_and_score_market_data failed, using defaults: %s", exc
+                )
+
         runnable = graph or build_graph()
         state = {
             "symbol": normalized,
             "cycle_timestamp": current,
             "correlation_id": correlation_id,
-            "market_context": _base_market_context(current, lock_acquired=True),
+            "market_context": context,
         }
         result = await runnable.ainvoke(state)
         result["status"] = "COMPLETED"
@@ -235,6 +271,7 @@ async def run_cycle(
         return result
     finally:
         release_run_lock(normalized, db=db)
+
 
 
 async def run_all_symbols_cycle(
