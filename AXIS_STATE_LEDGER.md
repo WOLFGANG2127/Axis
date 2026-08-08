@@ -115,4 +115,4 @@ migration live in Supabase — all 7 tables, Section 3.3)
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
-- D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z
+- D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z (commit 37d2fe36)
