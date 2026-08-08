@@ -104,6 +104,7 @@ ALTER TABLE cycle_summaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE macro_regime_flags ENABLE ROW LEVEL SECURITY;
 
 -- Grant anon SELECT on signals only (dashboard read-only access per A§5.2 step 3a)
-CREATE POLICY IF NOT EXISTS "anon_read_signals" ON signals
+DROP POLICY IF EXISTS "anon_read_signals" ON signals;
+CREATE POLICY "anon_read_signals" ON signals
     FOR SELECT TO anon USING (true);
 -- All other tables: RLS enabled, zero anon policies -- service_role only (backend writes).
