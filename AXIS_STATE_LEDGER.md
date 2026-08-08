@@ -88,10 +88,10 @@ D-011:🟢 VERIFIED
 migration live in Supabase — all 7 tables, Section 3.3)
 
 ## TASK BOARD
-- D-011: 🔴 TODO
-- D-001: 🔴 TODO
-- D-045: 🔴 TODO
-- D-047: 🔴 TODO
+- D-011: Agent 5 PASS
+- D-001: Agent 5 PASS
+- D-045: Agent 5 PASS
+- D-047: Agent 5 PASS
 - D-012: 🔴 TODO
 - D-T6: 🔴 TODO
 - D-018: 🔴 TODO
