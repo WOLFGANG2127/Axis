@@ -83,7 +83,7 @@ fb9ef6e8d97d9eea97daafef72824fe1bda20c98e226afa449ddbe536e723757  src/scoring/la
 (some files missing — note which ones, that's signal on its own)
 
 ## DATABASE VERIFICATION
-D-011: 🔴 NOT VERIFIED
+D-011:🟢 VERIFIED
 (flip to "🟢 VERIFIED" only after personally applying and checking the
 migration live in Supabase — all 7 tables, Section 3.3)
 
