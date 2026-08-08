@@ -83,15 +83,15 @@ fb9ef6e8d97d9eea97daafef72824fe1bda20c98e226afa449ddbe536e723757  src/scoring/la
 (some files missing — note which ones, that's signal on its own)
 
 ## DATABASE VERIFICATION
-D-011:🟢 VERIFIED
+D-011: 🟢 VERIFIED
 (flip to "🟢 VERIFIED" only after personally applying and checking the
 migration live in Supabase — all 7 tables, Section 3.3)
 
 ## TASK BOARD
-- D-011: Agent 5 PASS
-- D-001: Agent 5 PASS
-- D-045: Agent 5 PASS
-- D-047: Agent 5 PASS
+- D-011: 🟢 DONE
+- D-001: 🟢 DONE
+- D-045: 🟢 DONE
+- D-047: 🟢 DONE
 - D-012: 🔴 TODO
 - D-T6: 🔴 TODO
 - D-018: 🔴 TODO
@@ -115,3 +115,4 @@ migration live in Supabase — all 7 tables, Section 3.3)
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
+- D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z
