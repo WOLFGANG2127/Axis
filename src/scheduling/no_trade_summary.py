@@ -17,6 +17,13 @@ def run_no_trade_summary() -> None:
         now = datetime.now(IST)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
         
+        # EOD active_position cleanup (D-050): DELETE FROM active_position WHERE opened_at::date < current_date
+        try:
+            db.table("active_position").delete().lt("opened_at", today_start).execute()
+            logger.info("Successfully executed EOD active_position cleanup.")
+        except Exception as cleanup_err:
+            logger.error("Failed to execute EOD active_position cleanup: %s", cleanup_err)
+        
         # 1. Check if any trades were executed today
         res = db.table("paper_trades").select("id").gte("exit_time", today_start).execute()
         today_trades = res.data or []
