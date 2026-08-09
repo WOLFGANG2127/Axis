@@ -95,26 +95,20 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-012: 🟢 DONE
 - D-T6: 🟢 DONE
 - D-018: 🟢 DONE
-- D-010: 🟣 PENDING QA
-- D-051: 🟣 PENDING QA
-- D-055: 🟣 PENDING QA
-- D-004: 🟣 PENDING QA
-- D-048: 🟣 PENDING QA
+- D-010: 🟢 DONE
+- D-051: 🟢 DONE
+- D-055: 🟢 DONE
+- D-004: 🟢 DONE
+- D-048: 🟢 DONE
 - D-005: 🔴 TODO
 - D-009: 🔴 TODO
 - D-008: 🔴 TODO
 - D-049: 🔴 TODO
-- D-050: 🟣 PENDING QA
+- D-050: 🔴 TODO
 - D-052: 🔴 TODO
 
 ## FILE LOCKS
 (one line per locked file, e.g. `server.py [Locked by Agent 3 at 2026-07-31T14:00:00Z]`)
-server.py [Locked by Agent 3 at 2026-08-09T21:58:00Z]
-Procfile [Locked by Agent 3 at 2026-08-09T21:58:00Z]
-.github/workflows/main_pipeline.yml [Locked by Agent 3 at 2026-08-09T21:58:00Z]
-src/scheduling/no_trade_summary.py [Locked by Agent 3 at 2026-08-09T21:58:00Z]
-src/commands/router.py [Locked by Agent 3 at 2026-08-09T21:58:00Z]
-
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)
@@ -134,3 +128,4 @@ src/commands/router.py [Locked by Agent 3 at 2026-08-09T21:58:00Z]
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
 - D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z (commit 37d2fe36)
 - D-012, D-T6, D-018 merged from agent2-dev at 2026-08-09T13:58:52Z (commit 8b5c9a5c)
+- D-010, D-051, D-055, D-004, D-048 merged from agent3-dev at 2026-08-09T17:22:23Z (commit ed4b0afb)
