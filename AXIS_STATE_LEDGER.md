@@ -100,15 +100,14 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-055: 🟢 DONE
 - D-004: 🟢 DONE
 - D-048: 🟢 DONE
-- D-005: 🔴 TODO
-- D-009: 🔴 TODO
-- D-008: 🔴 TODO
-- D-049: 🔴 TODO
-- D-050: 🔴 TODO
-- D-052: 🔴 TODO
+- D-005: 🟣 PENDING QA
+- D-009: 🟣 PENDING QA
+- D-008: 🟣 PENDING QA
+- D-049: 🟣 PENDING QA
+- D-050: 🟣 PENDING QA
+- D-052: 🟣 PENDING QA
 
 ## FILE LOCKS
-(one line per locked file, e.g. `server.py [Locked by Agent 3 at 2026-07-31T14:00:00Z]`)
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)
@@ -122,6 +121,14 @@ migration live in Supabase — all 7 tables, Section 3.3)
   - src/scheduling/no_trade_summary.py
   - tests/test_agent3_devops.py
   - tests/test_track_e_devops.py
+  - AXIS_STATE_LEDGER.md
+- Agent 4 (System Orchestrator) completed D-005, D-009, D-008, D-049, D-050 (core active-position tracking), and D-052. Status set to 🟣 PENDING QA. Ready for Agent 5 QA review.
+  Files touched:
+  - main.py
+  - src/graph/graph.py
+  - src/graph/nodes.py
+  - src/scheduling/calendar_gate.py
+  - tests/test_agent4_orchestration.py
   - AXIS_STATE_LEDGER.md
 
 ## ACTIVITY LOG
