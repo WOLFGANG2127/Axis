@@ -240,3 +240,15 @@ def test_wyckoff_seed_migration_registers_active_strategy_with_shadow_gate_chang
     assert '"DAILY_LOSS_BREAKER": "SHADOW"' in sql
     assert '"RR_FILTER": "SHADOW"' in sql
     assert '"CROSS_SYMBOL_CORRELATION": "SHADOW"' in sql
+
+
+def test_strategies_includes_wyckoff_and_gvof_in_correct_sequence():
+    from src.graph.nodes import STRATEGIES
+    from src.strategies.base import BaseStrategy
+    
+    assert len(STRATEGIES) == 2
+    assert all(isinstance(strategy, BaseStrategy) for strategy in STRATEGIES)
+    
+    # "first strategy match wins" order per Appendix K #6:
+    assert STRATEGIES[0].name == "GVOF"
+    assert STRATEGIES[1].name == "Wyckoff Mean Reversion"

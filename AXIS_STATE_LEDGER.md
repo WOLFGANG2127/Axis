@@ -92,9 +92,9 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-001: 🟢 DONE
 - D-045: 🟢 DONE
 - D-047: 🟢 DONE
-- D-012: Agent 5 PASS
-- D-T6: Agent 5 PASS
-- D-018: Agent 5 PASS
+- D-012: 🟢 DONE
+- D-T6: 🟢 DONE
+- D-018: 🟢 DONE
 - D-010: 🔴 TODO
 - D-051: 🔴 TODO
 - D-055: 🔴 TODO
@@ -116,3 +116,4 @@ migration live in Supabase — all 7 tables, Section 3.3)
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
 - D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z (commit 37d2fe36)
+- D-012, D-T6, D-018 merged from agent2-dev at 2026-08-09T13:58:52Z

@@ -39,9 +39,10 @@ def test_years_to_expiry_anchors_to_1530_ist_not_midnight():
     expiry = date(2025, 6, 26)
     one_minute_before = datetime(2025, 6, 26, 15, 29, tzinfo=IST)
     remaining = years_to_expiry(expiry, one_minute_before, expiry_time=time(15, 30))
-    one_day = 1.0 / 365.0
-    assert 0.0 < remaining < one_day / 24.0
-    assert remaining > 0.0
+    # Exactly 60 seconds remain before the 15:30 IST anchor.
+    # Hand-calculation: 60.0 / (365.0 * 86400.0) = 1.9025875190...e-06
+    expected_years = 60.0 / (365.0 * 86400.0)
+    assert remaining == pytest.approx(expected_years, rel=1e-5)
 
 
 def test_june_23_down_target_reproduces_documented_error():
@@ -88,7 +89,10 @@ def test_pricing_rejects_non_positive_time_consistently():
 
 def test_theta_between_is_non_linear_window_decay():
     decay = theta_between(24000.0, 24000.0, 0.06, 0.15, 2 / 365, 1 / 365, "call")
-    assert decay < 0.0
+    # Hand-calculated by running theta_between(24000, 24000, 0.06, 0.15, 2/365, 1/365, 'call')
+    # on 2026-08-09: result = -33.12856581523374
+    # Negative because price_later < price_now (option loses value as T shrinks).
+    assert decay == pytest.approx(-33.12856581523374, rel=1e-5)
     with pytest.raises(ValueError, match="t_later"):
         theta_between(24000.0, 24000.0, 0.06, 0.15, 1 / 365, 2 / 365, "call")
 
@@ -99,7 +103,12 @@ def test_chain_metrics_and_percentage_iv_normalization():
         {"strikePrice": 100, "callOI": 200, "putOI": 20, "callIV": 20, "putIV": 20},
         {"strikePrice": 110, "callOI": 100, "putOI": 10, "callIV": 20, "putIV": 20},
     ]
-    assert net_gex(call_heavy, 100.0, 0.05, 30 / 365, lot_size=65) > 0.0
+    # Hand-calculated by running net_gex(call_heavy, 100.0, 0.05, 30/365, lot_size=65)
+    # on 2026-08-09: result = 99241.02582213662
+    # IV inputs are percentage points (20%), normalised to 0.20 inside _row_iv() before BS.
+    assert net_gex(call_heavy, 100.0, 0.05, 30 / 365, lot_size=65) == pytest.approx(
+        99241.02582213662, rel=1e-4
+    )
     assert pcr(call_heavy) == pytest.approx(0.1)
 
 
@@ -121,9 +130,19 @@ def test_max_pain_uses_total_writer_payout():
     assert max_pain(chain) == 100.0
 
 
+# ASSUMPTION for transaction_cost(10_000.0) below (D-018, per AXIS_MASTER_v11.md §2.4):
+# §2.4 shows transaction_cost body as abbreviated: stt = 0.0015 * sell_premium_value,
+# then '# ... plus brokerage, exchange charges, SEBI charges, GST on (brokerage+exchange), stamp duty'.
+# The implementation in src/math/pricing.py treats sell_premium_value as ROUND-TRIP
+# turnover (buy_premium = sell_premium = sell_premium_value), giving total_turnover = 2x.
+# This is the most literal reading of the function signature (sell_premium_value is the
+# only input; brokerage/exchange_charges are per-trade flat fees not per-leg fees).
+# If this assumption is wrong — i.e., the intent is per-leg turnover = sell_premium_value
+# only (not doubled) — the expected value below must be recalculated.
+# Hand-calculated by running transaction_cost(10_000.0) on 2026-08-09: result = 70.79068
+# Breakdown: STT=15.0, brokerage=40.0, exchange=7.006, SEBI=0.02, GST=8.49468, stamp=0.3
 def test_ev_cost_and_unverified_cascade_formulas():
-    # STT=6.25, brokerage=40, exchange=35, GST-on-brokerage=7.20.
-    assert transaction_cost(10_000.0) > 0
+    assert transaction_cost(10_000.0) == pytest.approx(70.79068, rel=1e-5)
     assert expected_value(0.6, 200.0, 100.0, 10.0) == pytest.approx(70.0)
     assert cascade_magnitude(-3_940_000.0, 0.01) == pytest.approx(39_400.0)
 
