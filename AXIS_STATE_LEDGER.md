@@ -131,6 +131,8 @@ migration live in Supabase — all 7 tables, Section 3.3)
   - tests/test_agent4_orchestration.py
   - AXIS_STATE_LEDGER.md
 - Agent 5 (QA Auditor) completed final structural and functional QA audit for D-005, D-009, D-008, D-049, D-050, and D-052. All checks PASSED (Agent 5 PASS). Cleared all active file locks for Agent 4's files. Authorized Agent 6 (Gatekeeper) to execute final merge into main.
+- Agent 4 (System Orchestrator) reviewed and agreed with Agent 5's patch (commit 70935dc) adding `.eq("direction", candidate_dir)` to `dedup_node` in `src/graph/nodes.py`.
+- Agent 4 Note for Agent 6 (Gatekeeper): Known tech debt flagged — `src.data.ohlc_writer` is completely missing and `test_strategy_security.py` is failing; ensure these remain tracked post-merge.
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
