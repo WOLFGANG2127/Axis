@@ -109,6 +109,10 @@ migration live in Supabase — all 7 tables, Section 3.3)
 
 ## FILE LOCKS
 (one line per locked file, e.g. `server.py [Locked by Agent 3 at 2026-07-31T14:00:00Z]`)
+src/graph/nodes.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
+src/strategies/__init__.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
+src/llm/router.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
+tests/test_pricing.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)

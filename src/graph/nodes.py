@@ -13,6 +13,7 @@ from src.scoring.direction_scorer import compute_direction_score
 from src.scoring.structure_gate import check_structure
 from src.strategies.base import BaseStrategy
 from src.strategies.gvof import GVOFStrategy
+from src.strategies.wyckoff_mean_reversion import WyckoffMeanReversionStrategy
 
 IST = ZoneInfo("Asia/Kolkata")
 Service = Callable[..., Any | Awaitable[Any]]
@@ -32,7 +33,10 @@ class NodeServices:
 
 
 SERVICES = NodeServices()
-STRATEGIES: list[BaseStrategy] = [GVOFStrategy()]
+# D-012: version-controlled, hardcoded strategy list (AXIS_MASTER_v11.md §2.5).
+# "first strategy match wins" is the accepted v11 trade-off — Appendix K #6.
+# Do NOT add a DB registry or dynamic loader here without a spec change.
+STRATEGIES: list[BaseStrategy] = [GVOFStrategy(), WyckoffMeanReversionStrategy()]
 
 
 def configure_node_services(**services: Service | None) -> None:
