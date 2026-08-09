@@ -92,9 +92,9 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-001: 🟢 DONE
 - D-045: 🟢 DONE
 - D-047: 🟢 DONE
-- D-012: 🟣 PENDING QA
-- D-T6: 🟣 PENDING QA
-- D-018: 🟣 PENDING QA
+- D-012: 🟢 DONE
+- D-T6: 🟢 DONE
+- D-018: 🟢 DONE
 - D-010: 🔴 TODO
 - D-051: 🔴 TODO
 - D-055: 🔴 TODO
@@ -138,6 +138,7 @@ tests/test_pricing.py [Released by Agent 2 at 2026-08-09T05:34:30Z]
   In commit d0b0f17e, the provenance comment in router.py was trimmed to honestly 
   cite only the 4 files actually used (AXIS_Knowledge_Base.md, Supplement, v5_final, 
   and JUNE 23 Analysis). The padded citations have been removed.
+[Agent 5 → Agent 6] 2026-08-09T06:14:46Z: QA completed for D-012, D-T6, and D-018. Structural QA and tests passed. Marked as 🟢 DONE. Ready to merge.
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
