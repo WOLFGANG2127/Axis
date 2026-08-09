@@ -92,9 +92,9 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-001: 🟢 DONE
 - D-045: 🟢 DONE
 - D-047: 🟢 DONE
-- D-012: 🔴 TODO
-- D-T6: 🔴 TODO
-- D-018: 🔴 TODO
+- D-012: Agent 5 PASS
+- D-T6: Agent 5 PASS
+- D-018: Agent 5 PASS
 - D-010: 🔴 TODO
 - D-051: 🔴 TODO
 - D-055: 🔴 TODO
