@@ -445,6 +445,7 @@ async def dedup_node(state: AxisState) -> dict:
                         db.table("signals")
                         .select("id")
                         .eq("symbol", symbol.upper())
+                        .eq("direction", candidate_dir)
                         .eq("active_strategy_slug", strategy_slug)
                         .gte("cycle_timestamp", sixty_mins_ago)
                         .limit(1)

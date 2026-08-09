@@ -183,7 +183,7 @@ async def test_d049_dedup_suppresses_identical_recent_signal():
     mock_db = MagicMock()
     mock_query = MagicMock()
     mock_query.execute.return_value.data = [{"id": "sig-123"}]
-    mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.gte.return_value.limit.return_value = mock_query
+    mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.gte.return_value.limit.return_value = mock_query
 
     now = datetime.now(IST)
     state = AxisState(
@@ -204,7 +204,7 @@ async def test_d049_dedup_allows_signal_when_no_recent_match():
     mock_db = MagicMock()
     mock_query = MagicMock()
     mock_query.execute.return_value.data = []
-    mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.gte.return_value.limit.return_value = mock_query
+    mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.gte.return_value.limit.return_value = mock_query
 
     now = datetime.now(IST)
     state = AxisState(
