@@ -8,10 +8,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  trade:
+  run-cycle:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     concurrency:
-      group: "${{ github.workflow }}"
+      group: axis-trading-cycle
       cancel-in-progress: false
     env:
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
