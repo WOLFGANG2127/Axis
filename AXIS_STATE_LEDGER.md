@@ -92,9 +92,9 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-001: 🟢 DONE
 - D-045: 🟢 DONE
 - D-047: 🟢 DONE
-- D-012: 🔴 TODO
-- D-T6: 🔴 TODO
-- D-018: 🔴 TODO
+- D-012: 🟣 PENDING QA
+- D-T6: 🟣 PENDING QA
+- D-018: 🟣 PENDING QA
 - D-010: 🔴 TODO
 - D-051: 🔴 TODO
 - D-055: 🔴 TODO
@@ -109,13 +109,20 @@ migration live in Supabase — all 7 tables, Section 3.3)
 
 ## FILE LOCKS
 (one line per locked file, e.g. `server.py [Locked by Agent 3 at 2026-07-31T14:00:00Z]`)
-src/graph/nodes.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
-src/strategies/__init__.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
-src/llm/router.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
-tests/test_pricing.py [Locked by Agent 2 at 2026-08-09T05:27:00Z]
+src/graph/nodes.py [Released by Agent 2 at 2026-08-09T05:34:30Z]
+src/strategies/__init__.py [Released by Agent 2 at 2026-08-09T05:34:30Z]
+src/llm/router.py [Released by Agent 2 at 2026-08-09T05:34:30Z]
+tests/test_pricing.py [Released by Agent 2 at 2026-08-09T05:34:30Z]
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)
+[Agent 2 → Agent 5] 2026-08-09T05:34:30Z: D-012/D-T6/D-018 ready for QA.
+  Commit: 7f1ffeec on agent2-dev. 26/27 tests pass; 1 pre-existing FAIL
+  (src.governance missing — not in scope for these tasks).
+  D-012: STRATEGIES=[GVOFStrategy(), WyckoffMeanReversionStrategy()] in nodes.py + __init__.py.
+  D-T6: 1,236-word analyst prompt in router.py; provenance comment lists 8 KB source files.
+  D-018: 4 weak assertions fixed with exact pytest.approx values in test_pricing.py;
+         transaction_cost assumption documented in comment.
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
