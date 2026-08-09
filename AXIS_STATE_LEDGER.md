@@ -100,42 +100,24 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-055: 🟢 DONE
 - D-004: 🟢 DONE
 - D-048: 🟢 DONE
-- D-005: Agent 5 PASS
-- D-009: Agent 5 PASS
-- D-008: Agent 5 PASS
-- D-049: Agent 5 PASS
-- D-050: Agent 5 PASS
-- D-052: Agent 5 PASS
+- D-005: 🟢 DONE
+- D-009: 🟢 DONE
+- D-008: 🟢 DONE
+- D-049: 🟢 DONE
+- D-050: 🟢 DONE
+- D-052: 🟢 DONE
 
 ## FILE LOCKS
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)
-- Agent 3 (DevOps) completed D-010, D-051, D-055, D-004, D-048, D-050 (EOD cleanup component). Status set to 🟣 PENDING QA. Ready for Agent 5 QA review.
-  Files touched:
-  - Procfile
-  - server.py
-  - .github/workflows/main_pipeline.yml
-  - src/commands/router.py
-  - src/commands/__init__.py
-  - src/scheduling/no_trade_summary.py
-  - tests/test_agent3_devops.py
-  - tests/test_track_e_devops.py
-  - AXIS_STATE_LEDGER.md
-- Agent 4 (System Orchestrator) completed D-005, D-009, D-008, D-049, D-050 (core active-position tracking), and D-052. Status set to 🟣 PENDING QA. Ready for Agent 5 QA review.
-  Files touched:
-  - main.py
-  - src/graph/graph.py
-  - src/graph/nodes.py
-  - src/scheduling/calendar_gate.py
-  - tests/test_agent4_orchestration.py
-  - AXIS_STATE_LEDGER.md
-- Agent 5 (QA Auditor) completed final structural and functional QA audit for D-005, D-009, D-008, D-049, D-050, and D-052. All checks PASSED (Agent 5 PASS). Cleared all active file locks for Agent 4's files. Authorized Agent 6 (Gatekeeper) to execute final merge into main.
-- Agent 4 (System Orchestrator) reviewed and agreed with Agent 5's patch (commit 70935dc) adding `.eq("direction", candidate_dir)` to `dedup_node` in `src/graph/nodes.py`.
-- Agent 4 Note for Agent 6 (Gatekeeper): Known tech debt flagged — `src.data.ohlc_writer` is completely missing and `test_strategy_security.py` is failing; ensure these remain tracked post-merge.
 
 ## ACTIVITY LOG
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
 - D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z (commit 37d2fe36)
 - D-012, D-T6, D-018 merged from agent2-dev at 2026-08-09T13:58:52Z (commit 8b5c9a5c)
 - D-010, D-051, D-055, D-004, D-048 merged from agent3-dev at 2026-08-09T17:22:23Z (commit ed4b0afb)
+- D-005, D-009, D-008, D-049, D-050, D-052 merged from agent4-dev at 2026-08-09T21:03:10Z (commit d005e071)
+
+## KNOWN TECH DEBT
+- Agent 4 Note: `src.data.ohlc_writer` is completely missing and `test_strategy_security.py` is failing; ensure these remain tracked post-merge.
