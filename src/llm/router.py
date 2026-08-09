@@ -26,11 +26,7 @@ def _safe_state_payload(state: AxisState) -> str:
 #   2. data/knowledge/AXIS_Knowledge_Base_Supplement.md — §1 patterns P23–P37
 #   3. data/knowledge/AXIS_Knowledge_Base_v5_final_consolidation.md — §1 resolved gaps,
 #      §3 cross-part consistency check, proposed Agent-1 decision procedure
-#   4. data/knowledge/STRUCTURED KNOWLEDGE BASE — AXIS TR.md — formula cross-reference
-#   5. data/knowledge/NIFTY JUNE 23 Analysis.md      — June 23 2026 real cascade example
-#   6. data/knowledge/NIFTY JUNE 22 2026 Technical.md — June 22 2026 setup example
-#   7. data/knowledge/16 June Nifty Technical Analysis.md — June 16 2026 PE decay example
-#   8. data/knowledge/17 june nifty analysis.md       — June 17 2026 session example
+#   4. data/knowledge/NIFTY JUNE 23 Analysis.md      — June 23 2026 real cascade example
 # Hard cap: 2,500 words. If adding rules would breach the cap, delete oldest/least
 # load-bearing rules first (bottom of block) before adding new ones.
 _ANALYST_SYSTEM_PROMPT = """\
