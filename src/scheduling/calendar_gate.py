@@ -45,27 +45,59 @@ def _table_data(query: Any) -> list[dict[str, Any]]:
     return data or []
 
 
-def is_system_paused(*, db: Any | None = None) -> tuple[bool, str | None]:
-    """Read the single-row ``system_paused`` kill switch.
+def is_system_paused(
+    *,
+    db: Any | None = None,
+    now: datetime | None = None,
+) -> tuple[bool, str | None]:
+    """Read the single-row ``system_paused`` kill switch and trader_session_state.
 
-    If the table/client is unavailable, fail open so a missing optional DB
-    check does not masquerade as a deliberate operator pause.
+    D-052 / D-T8: Strict fail-closed policy. If the table/client is unavailable,
+    queries fail, or the system_paused table is empty (0 rows returned), resolve
+    to PAUSED (True).
     """
 
-    if db is None:
+    database = db
+    if database is None:
         try:
             from src.scheduling.lock_manager import get_lock_db
 
-            db = get_lock_db()
+            database = get_lock_db()
         except Exception:
-            db = None
-    if db is None:
-        return False, None
+            database = None
+
+    if database is None:
+        return True, "UNREADABLE_PAUSE_STATE"
+
+    # Step 1: Read system_paused
     try:
-        rows = _table_data(db.table("system_paused").select("paused,reason").limit(1))
-    except Exception:
-        return False, None
+        rows = _table_data(database.table("system_paused").select("*").limit(1))
+    except Exception as exc:
+        return True, f"UNREADABLE_PAUSE_STATE: {exc}"
+
     if not rows:
-        return False, None
+        return True, "UNREADABLE_PAUSE_STATE"
+
     row = rows[0]
-    return bool(row.get("paused")), row.get("reason")
+    is_paused = row.get("is_paused") if "is_paused" in row else row.get("paused")
+    if is_paused is None:
+        return True, "UNREADABLE_PAUSE_STATE"
+    if bool(is_paused):
+        reason = row.get("paused_reason") or row.get("reason") or "Operator paused system"
+        return True, str(reason)
+
+    # Step 2: Read trader_session_state readiness
+    try:
+        today_iso = _as_ist(now).date().isoformat()
+        session_rows = _table_data(
+            database.table("trader_session_state")
+            .select("is_ready")
+            .eq("session_date", today_iso)
+            .limit(1)
+        )
+        if not session_rows or not bool(session_rows[0].get("is_ready")):
+            return True, "TRADER_SESSION_NOT_READY"
+    except Exception:
+        return True, "TRADER_SESSION_READ_ERROR"
+
+    return False, None

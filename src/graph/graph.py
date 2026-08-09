@@ -11,6 +11,7 @@ from src.graph.nodes import (
     dedup_node,
     direction_scorer_node,
     lock_acquire_node,
+    position_state_check_node,
     risk_check_node,
     strategy_activation_node,
     structure_gate_node,
@@ -31,6 +32,7 @@ def build_graph():
     builder.add_node("strategy_activation", strategy_activation_node)
     builder.add_node("analyst_node", analyst_node)
     builder.add_node("verifier_node", verifier_node)
+    builder.add_node("position_state_check", position_state_check_node)
     builder.add_node("risk", risk_check_node)
     builder.add_node("dedup", dedup_node)
     builder.add_node("telegram", telegram_dispatch_node)
@@ -46,8 +48,9 @@ def build_graph():
     builder.add_conditional_edges(
         "verifier_node",
         verifier_route,
-        {"BLOCK": END, "PROCEED": "risk"},
+        {"BLOCK": END, "PROCEED": "position_state_check"},
     )
+    builder.add_edge("position_state_check", "risk")
     builder.add_edge("risk", "dedup")
     builder.add_edge("dedup", "telegram")
     builder.add_edge("telegram", END)
