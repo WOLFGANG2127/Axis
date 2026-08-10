@@ -118,6 +118,15 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-012, D-T6, D-018 merged from agent2-dev at 2026-08-09T13:58:52Z (commit 8b5c9a5c)
 - D-010, D-051, D-055, D-004, D-048 merged from agent3-dev at 2026-08-09T17:22:23Z (commit ed4b0afb)
 - D-005, D-009, D-008, D-049, D-050, D-052 merged from agent4-dev at 2026-08-09T21:03:10Z (commit d005e071)
+- D-007 (ohlc_writer) fixed on main at 2026-08-10T05:01:26Z (commit fc88b172)
 
 ## KNOWN TECH DEBT
 - Agent 4 Note: `src.data.ohlc_writer` is completely missing and `test_strategy_security.py` is failing; ensure these remain tracked post-merge.
+  **RESOLVED by Agent 6 (commit fc88b172, 2026-08-10):**
+  - `src/data/ohlc_writer.py` implemented: `persist_ohlc_candles()` + `candle_rows_from_context()` per Phase 2.5 spec.
+    Upserts to `ohlc_candles` table (conflict key `symbol,interval,timestamp`). DB injection supported.
+  - `migrations/021_ohlc_candles.sql` created: RLS-gated, `source DEFAULT 'dhan'`, TIMESTAMPTZ PK.
+  - `test_strategy_security.py` corrected: `requests` → `FORBIDDEN_NETWORK_IMPORT` (not `IMPORT_OUTSIDE_ALLOWLIST`).
+  - All 4 `test_phase25_ohlc_candles.py` tests now pass. Both security tests pass.
+  - Remaining pre-existing failures (not this fix): `test_step6.py::TestLassoReweighting` (numerical assert),
+    `test_wyckoff_mean_reversion.py::...shadow_gates` (missing `src.governance.gate_policy`).
