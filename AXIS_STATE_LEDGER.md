@@ -119,6 +119,8 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-010, D-051, D-055, D-004, D-048 merged from agent3-dev at 2026-08-09T17:22:23Z (commit ed4b0afb)
 - D-005, D-009, D-008, D-049, D-050, D-052 merged from agent4-dev at 2026-08-09T21:03:10Z (commit d005e071)
 - D-007 (ohlc_writer) fixed on main at 2026-08-10T05:01:26Z (commit fc88b172)
+- PHASE 0 DEPLOY BUNDLE created at 2026-08-10T22:04:19Z (commit 873c959c)
+- MAIN PIPELINE CONCURRENCY FIX applied at 2026-08-12T02:27:39Z (commit faec3395)
 
 ## KNOWN TECH DEBT
 - Agent 4 Note: `src.data.ohlc_writer` is completely missing and `test_strategy_security.py` is failing; ensure these remain tracked post-merge.
