@@ -129,7 +129,28 @@ def _underlying(symbol: str) -> dict[str, Any]:
         raise ValueError("symbol must be NIFTY or BANKNIFTY") from exc
 
 
+class DhanRateLimitError(RuntimeError):
+    """Raised when Dhan rejects a request due to its per-endpoint rate limit.
+
+    This is a *retryable* condition — not a broken token or invalid credential.
+    The caller should back off and retry after the cooldown window has elapsed.
+    """
+
+
 def _raise_for_api_error(response: httpx.Response) -> None:
+    """Raise on any Dhan API error, whether HTTP-level or JSON-body-level.
+
+    Dhan occasionally returns HTTP 200 with a JSON body containing
+    ``"status": "error"`` instead of using a non-2xx status code.  This
+    function normalises both cases so callers never silently receive a
+    success envelope wrapping an error payload.
+
+    Raises:
+        DhanRateLimitError: For "Token can be generated once every 2 minutes."
+            This is benign and retryable — not a broken credential.
+        RuntimeError: For all other API-level or HTTP-level errors.
+    """
+    # --- Step 1: standard HTTP error codes (4xx / 5xx) ---------------------
     if response.status_code >= 400:
         error_body = response.text
         try:
@@ -141,11 +162,31 @@ def _raise_for_api_error(response: httpx.Response) -> None:
             detail = error_body
         raise RuntimeError(f"Dhan API Error {response.status_code}: {detail}")
     response.raise_for_status()
-    payload = response.json()
-    if isinstance(payload, dict) and payload.get("errorCode"):
+
+    # --- Step 2: HTTP 200 but JSON body signals an error -------------------
+    try:
+        payload = response.json()
+    except Exception:
+        # Non-JSON body on a 200 is fine for endpoints that don't return JSON
+        return
+
+    if not isinstance(payload, dict):
+        return
+
+    # Existing check: errorCode field (non-auth endpoints)
+    if payload.get("errorCode"):
         raise RuntimeError(
             f"Dhan API {payload['errorCode']}: {payload.get('errorMessage', 'unknown error')}"
         )
+
+    # New check: status=error field (auth endpoint returns this on 200)
+    if payload.get("status") == "error":
+        message = payload.get("message", "unknown error")
+        if "once every 2 minutes" in message.lower():
+            raise DhanRateLimitError(
+                f"Dhan rate limit hit — back off and retry: {message}"
+            )
+        raise RuntimeError(f"Dhan API returned status=error: {message}")
 
 
 def _candles_from_columnar(payload: dict[str, Any]) -> list[dict[str, Any]]:
