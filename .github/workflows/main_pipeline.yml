@@ -15,9 +15,6 @@ jobs:
   run-cycle:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    concurrency:
-      group: axis-trading-cycle
-      cancel-in-progress: false
     env:
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
