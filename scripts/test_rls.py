@@ -2,16 +2,19 @@ import os
 import requests
 
 def test_anon_access():
-    supabase_url = "https://siutlouqtpzppavyvqoj.supabase.co"
-    anon_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpdXRsb3VxdHB6cHBhdnl2cW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwODE2OTIsImV4cCI6MjA5ODY1NzY5Mn0.rVx2TR04SEwYVYipWRMaeWrW6SMaFUpUE39s0kFyJXc"
-    
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
+
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables")
+
     headers = {
-        "apikey": anon_key,
-        "Authorization": f"Bearer {anon_key}",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
         "Content-Type": "application/json"
     }
     
-    res = requests.get(f"{supabase_url}/rest/v1/strategies?select=*", headers=headers)
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/strategies?select=*", headers=headers)
     print("Status Code:", res.status_code)
     print("Response:", res.text)
 

@@ -3,17 +3,20 @@ import requests
 import json
 
 def fetch_strategies():
-    supabase_url = "https://siutlouqtpzppavyvqoj.supabase.co"
-    service_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpdXRsb3VxdHB6cHBhdnl2cW9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzA4MTY5MiwiZXhwIjoyMDk4NjU3NjkyfQ.tPGlP1lHLlkUFZ1cpkn9W7lv0pCYyyZfNZJiJ7LI0I8"
-    
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not SUPABASE_URL or not SERVICE_ROLE_KEY:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables")
+
     headers = {
-        "apikey": service_key,
-        "Authorization": f"Bearer {service_key}",
+        "apikey": SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SERVICE_ROLE_KEY}",
         "Content-Type": "application/json"
     }
     
     # 1. Fetch exact rows to prove the data exists
-    res = requests.get(f"{supabase_url}/rest/v1/strategies?select=*", headers=headers)
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/strategies?select=*", headers=headers)
     print("=== DATA INTERROGATION (SERVICE ROLE) ===")
     print("Status Code:", res.status_code)
     try:
@@ -24,13 +27,17 @@ def fetch_strategies():
         print("Raw text:", res.text)
         
     # 2. Fetch using ANON key to prove RLS is blocking
-    anon_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpdXRsb3VxdHB6cHBhdnl2cW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwODE2OTIsImV4cCI6MjA5ODY1NzY5Mn0.rVx2TR04SEwYVYipWRMaeWrW6SMaFUpUE39s0kFyJXc"
+    SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
+    if not SUPABASE_ANON_KEY:
+        print("\nSUPABASE_ANON_KEY not set, skipping anon RLS test.")
+        return
+
     headers_anon = {
-        "apikey": anon_key,
-        "Authorization": f"Bearer {anon_key}",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
         "Content-Type": "application/json"
     }
-    res_anon = requests.get(f"{supabase_url}/rest/v1/strategies?select=*", headers=headers_anon)
+    res_anon = requests.get(f"{SUPABASE_URL}/rest/v1/strategies?select=*", headers=headers_anon)
     print("\n=== DATA INTERROGATION (ANON ROLE - RLS TEST) ===")
     print("Status Code:", res_anon.status_code)
     print("Data:", res_anon.text)
