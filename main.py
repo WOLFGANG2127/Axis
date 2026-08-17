@@ -268,11 +268,7 @@ async def run_cycle(
         result = await runnable.ainvoke(state)
         result["status"] = "COMPLETED"
         result["correlation_id"] = result.get("correlation_id") or correlation_id
-        _commit_cycle_summary(normalized, "COMPLETED", db=db)
         return result
-    except Exception as exc:
-        _commit_cycle_summary(normalized, "CRASH", errors=[{"error": str(exc)}], db=db)
-        raise
     finally:
         release_run_lock(normalized, db=db)
 
@@ -327,10 +323,8 @@ async def run_all_symbols_cycle(
                 result["symbol"] = result.get("symbol") or symbol
                 result["correlation_id"] = result.get("correlation_id") or correlation_id
                 results.append(result)
-                _commit_cycle_summary(symbol, "COMPLETED", db=db)
             except Exception as exc:
                 results.append({"symbol": symbol, "status": "ERROR", "error": str(exc)})
-                _commit_cycle_summary(symbol, "CRASH", errors=[{"error": str(exc)}], db=db)
         apply_same_cycle_correlation(results)
         _commit_macro_regime_flags(results, db=db)
         _dispatch_deferred_alerts(results)
@@ -338,38 +332,6 @@ async def run_all_symbols_cycle(
     finally:
         for symbol in acquired:
             release_run_lock(symbol, db=db)
-
-
-def _commit_cycle_summary(
-    symbol: str,
-    status: str,
-    *,
-    errors: list[dict[str, Any]] | None = None,
-    duration_ms: int = 0,
-    db: Any | None = None,
-) -> None:
-    database = db
-    if database is None:
-        try:
-            from src.database.supabase import get_supabase_client
-
-            database = get_supabase_client()
-        except Exception:
-            return
-    if database is None:
-        return
-    try:
-        database.table("cycle_summaries").insert(
-            {
-                "symbol": symbol,
-                "status": status,
-                "cycle_timestamp": datetime.now(IST).isoformat(),
-                "duration_ms": duration_ms,
-                "errors": errors or [],
-            }
-        ).execute()
-    except Exception:
-        pass
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -380,28 +342,14 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-CYCLE_WALL_CLOCK_TIMEOUT_SECONDS = 280.0
-
-
 async def _amain() -> None:
     args = _parser().parse_args()
-    try:
-        if args.all:
-            result = await asyncio.wait_for(
-                run_all_symbols_cycle(),
-                timeout=CYCLE_WALL_CLOCK_TIMEOUT_SECONDS,
-            )
-        else:
-            result = await asyncio.wait_for(
-                run_cycle(args.symbol),
-                timeout=CYCLE_WALL_CLOCK_TIMEOUT_SECONDS,
-            )
-        print(result)
-    except asyncio.TimeoutError as exc:
-        sym = "ALL" if args.all else (args.symbol or "UNKNOWN")
-        _commit_cycle_summary(sym, "TIMEOUT", errors=[{"error": "CYCLE_WALL_CLOCK_TIMEOUT"}])
-        raise TimeoutError(f"Cycle execution exceeded hard wall-clock limit of {CYCLE_WALL_CLOCK_TIMEOUT_SECONDS}s") from exc
+    result = await run_all_symbols_cycle() if args.all else await run_cycle(args.symbol)
+    print(result)
 
+
+if __name__ == "__main__":
+    asyncio.run(_amain())
 
 def _send_pipeline_crash_alert(exc: BaseException) -> None:
     try:
@@ -418,7 +366,3 @@ def _run_cli() -> None:
     except Exception as exc:
         _send_pipeline_crash_alert(exc)
         raise
-
-
-if __name__ == "__main__":
-    _run_cli()

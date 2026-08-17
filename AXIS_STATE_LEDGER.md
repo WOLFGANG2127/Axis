@@ -95,19 +95,20 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-012: 🟢 DONE
 - D-T6: 🟢 DONE
 - D-018: 🟢 DONE
-- D-010: 🟢 DONE
-- D-051: 🟢 DONE
-- D-055: 🟢 DONE
-- D-004: 🟢 DONE
-- D-048: 🟢 DONE
-- D-005: 🟢 DONE
-- D-009: 🟢 DONE
-- D-008: 🟢 DONE
-- D-049: 🟢 DONE
-- D-050: 🟢 DONE
-- D-052: 🟢 DONE
+- D-010: 🔴 TODO
+- D-051: 🔴 TODO
+- D-055: 🔴 TODO
+- D-004: 🔴 TODO
+- D-048: 🔴 TODO
+- D-005: 🔴 TODO
+- D-009: 🔴 TODO
+- D-008: 🔴 TODO
+- D-049: 🔴 TODO
+- D-050: 🔴 TODO
+- D-052: 🔴 TODO
 
 ## FILE LOCKS
+(one line per locked file, e.g. `server.py [Locked by Agent 3 at 2026-07-31T14:00:00Z]`)
 
 ## AGENT COMMUNICATOR
 (append-only; Agent 6 deletes a task's resolved lines only when it hits 🟢 DONE)
@@ -116,19 +117,3 @@ migration live in Supabase — all 7 tables, Section 3.3)
 (Agent 6 appends one line per merge — task ID, timestamp, commit hash)
 - D-011, D-001, D-045, D-047 merged from agent1-dev at 2026-08-09T01:36:19Z (commit 37d2fe36)
 - D-012, D-T6, D-018 merged from agent2-dev at 2026-08-09T13:58:52Z (commit 8b5c9a5c)
-- D-010, D-051, D-055, D-004, D-048 merged from agent3-dev at 2026-08-09T17:22:23Z (commit ed4b0afb)
-- D-005, D-009, D-008, D-049, D-050, D-052 merged from agent4-dev at 2026-08-09T21:03:10Z (commit d005e071)
-- D-007 (ohlc_writer) fixed on main at 2026-08-10T05:01:26Z (commit fc88b172)
-- PHASE 0 DEPLOY BUNDLE created at 2026-08-10T22:04:19Z (commit 873c959c)
-- MAIN PIPELINE CONCURRENCY FIX applied at 2026-08-12T02:27:39Z (commit faec3395)
-
-## KNOWN TECH DEBT
-- Agent 4 Note: `src.data.ohlc_writer` is completely missing and `test_strategy_security.py` is failing; ensure these remain tracked post-merge.
-  **RESOLVED by Agent 6 (commit fc88b172, 2026-08-10):**
-  - `src/data/ohlc_writer.py` implemented: `persist_ohlc_candles()` + `candle_rows_from_context()` per Phase 2.5 spec.
-    Upserts to `ohlc_candles` table (conflict key `symbol,interval,timestamp`). DB injection supported.
-  - `migrations/021_ohlc_candles.sql` created: RLS-gated, `source DEFAULT 'dhan'`, TIMESTAMPTZ PK.
-  - `test_strategy_security.py` corrected: `requests` → `FORBIDDEN_NETWORK_IMPORT` (not `IMPORT_OUTSIDE_ALLOWLIST`).
-  - All 4 `test_phase25_ohlc_candles.py` tests now pass. Both security tests pass.
-  - Remaining pre-existing failures (not this fix): `test_step6.py::TestLassoReweighting` (numerical assert),
-    `test_wyckoff_mean_reversion.py::...shadow_gates` (missing `src.governance.gate_policy`).

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import inspect
-import logging
 from dataclasses import dataclass, fields
 from datetime import datetime
 from typing import Any, Awaitable, Callable, Mapping
@@ -17,7 +16,6 @@ from src.strategies.gvof import GVOFStrategy
 from src.strategies.wyckoff_mean_reversion import WyckoffMeanReversionStrategy
 
 IST = ZoneInfo("Asia/Kolkata")
-_log = logging.getLogger("axis.nodes")
 Service = Callable[..., Any | Awaitable[Any]]
 
 
@@ -258,9 +256,59 @@ async def verifier_node(state: AxisState) -> dict:
         if str(decision).upper() == "PROCEED":
             try:
                 from src.database.supabase import get_supabase_client
-
+                import math
+                from datetime import timedelta
+                
                 db = get_supabase_client()
                 now = datetime.now(IST)
+                sixty_mins_ago = (now - timedelta(minutes=60)).isoformat()
+                
+                my_symbol = (state.symbol or "").upper()
+                my_dir = strategy.get("direction", "").lower()
+                other_symbol = "BANKNIFTY" if my_symbol == "NIFTY" else "NIFTY"
+                
+                # 1. Query macro_regime_flags for the other symbol
+                flags_res = db.table("macro_regime_flags") \
+                    .select("*") \
+                    .eq("symbol", other_symbol) \
+                    .gte("signal_timestamp", sixty_mins_ago) \
+                    .order("signal_timestamp", desc=True) \
+                    .limit(1) \
+                    .execute()
+                    
+                if flags_res.data and my_dir:
+                    other_flag = flags_res.data[0]
+                    other_dir = other_flag.get("direction", "").lower()
+                    other_time = other_flag.get("signal_timestamp")
+                    
+                    # 2. Hedging vs. Correlation Gate
+                    if other_dir == my_dir:
+                        # Same-direction correlation: Apply risk reduction
+                        orig_lots = strategy.get("lots", 0)
+                        if orig_lots > 0:
+                            new_lots = max(1, math.floor(orig_lots / 2))
+                            # Proportionally reduce capital/risk
+                            reduction_ratio = new_lots / orig_lots
+                            
+                            strategy["lots"] = new_lots
+                            if "capital_deployed" in strategy:
+                                strategy["capital_deployed"] *= reduction_ratio
+                            if "risk_rupees" in strategy:
+                                strategy["risk_rupees"] *= reduction_ratio
+                                
+                            # 4. Inject Tag
+                            tag_time = datetime.fromisoformat(str(other_time).replace("Z", "+00:00")).astimezone(IST).strftime("%H:%M")
+                            strategy["alert_tag"] = f"⚠️ CORRELATED SIGNAL — {other_symbol} {other_dir.capitalize()} at {tag_time}"
+                            ret["active_strategy"] = strategy
+                            
+                # 5. Insert current signal's data into macro_regime_flags
+                if my_symbol and my_dir:
+                    db.table("macro_regime_flags").insert({
+                        "symbol": my_symbol,
+                        "direction": my_dir,
+                        "signal_timestamp": now.isoformat(),
+                        "session_id": "SYS" # Fallback since session_id isn't directly in AxisState
+                    }).execute()
                     
                 # 6. Capture Signal Metadata
                 trades_res = db.table("paper_trades").select("exit_time,pnl_rupees").order("exit_time", desc=True).limit(10).execute()
@@ -341,56 +389,6 @@ async def risk_check_node(state: AxisState) -> dict:
         }
 
 
-async def position_state_check_node(state: AxisState) -> dict:
-    """D-050: Active-position tracking logic.
-
-    Checks active_position table for symbol PRIMARY KEY.
-    - Same-direction open position -> suppress signal (position_conflict=True, risk_approved=False).
-    - Opposite-direction open position -> flag as exit warning (exit_warning=True).
-    """
-    symbol = (state.symbol or "").upper()
-    if not symbol:
-        return {"position_conflict": False}
-
-    try:
-        from src.database.supabase import get_supabase_client
-
-        db = get_supabase_client()
-        pos_res = db.table("active_position").select("*").eq("symbol", symbol).limit(1).execute()
-        if not pos_res.data:
-            return {"position_conflict": False}
-
-        active = pos_res.data[0]
-        pos_option = str(active.get("option_type") or "").upper()
-
-        strategy = state.active_strategy or {}
-        candidate_dir = str(strategy.get("direction") or "").lower()
-
-        pos_dir = "long" if pos_option == "CE" else ("short" if pos_option == "PE" else "")
-
-        if candidate_dir and pos_dir:
-            if candidate_dir == pos_dir:
-                return {
-                    "position_conflict": True,
-                    "risk_approved": False,
-                    "dedup_status": "POSITION_HELD_SUPPRESSED",
-                }
-            else:
-                return {
-                    "position_conflict": "EXIT_WARNING",
-                    "exit_warning": True,
-                }
-
-        return {
-            "position_conflict": True,
-            "risk_approved": False,
-            "dedup_status": "POSITION_HELD_SUPPRESSED",
-        }
-    except Exception as exc:
-        _log.warning("position_state_check_node query failed for %s: %s", symbol, exc)
-        return {"position_conflict": False}
-
-
 async def dedup_node(state: AxisState) -> dict:
     now = datetime.now(IST)
     timestamp = state.cycle_timestamp
@@ -428,34 +426,6 @@ async def dedup_node(state: AxisState) -> dict:
             duplicate = bool(await _call(SERVICES.dedup_check, state))
         else:
             duplicate = bool(_context(state).get("duplicate_alert", False))
-
-        # D-049: 60-minute dedup suppression horizon using (symbol, direction, strategy_slug)
-        if not duplicate and symbol:
-            strategy_obj = state.active_strategy or {}
-            strategy_slug = str(strategy_obj.get("strategy_name") or strategy_obj.get("strategy_id") or "").strip().lower().replace(" ", "_")
-            candidate_dir = str(strategy_obj.get("direction") or "").strip().lower()
-            if strategy_slug:
-                try:
-                    from src.database.supabase import get_supabase_client
-                    from datetime import timedelta
-
-                    db = get_supabase_client()
-                    sixty_mins_ago = (now - timedelta(minutes=60)).isoformat()
-                    query = (
-                        db.table("signals")
-                        .select("id")
-                        .eq("symbol", symbol.upper())
-                        .eq("direction", candidate_dir)
-                        .eq("active_strategy_slug", strategy_slug)
-                        .gte("cycle_timestamp", sixty_mins_ago)
-                        .limit(1)
-                    )
-                    res = query.execute()
-                    if res.data:
-                        duplicate = True
-                except Exception as exc:
-                    _log.warning("dedup_node DB query failed: %s", exc)
-
         return {"dedup_status": "DUPLICATE_SUPPRESSED" if duplicate else "CLEAR"}
     except Exception as exc:
         return {

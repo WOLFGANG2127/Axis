@@ -45,11 +45,26 @@ def test_main_pipeline_references_required_backend_secrets():
 
 
 def test_settings_fail_loudly_when_webhook_secret_missing(monkeypatch):
-    from src.config.settings import settings
+    for key, value in {
+        "GOOGLE_API_KEY": "google",
+        "GROQ_API_KEY": "groq",
+        "ZAI_API_KEY": "zai",
+        "TELEGRAM_BOT_TOKEN": "token",
+        "TELEGRAM_CHAT_ID": "123",
+        "DHAN_CLIENT_ID": "dhan",
+        "DHAN_ACCESS_TOKEN": "dhan-token",
+        "DHAN_TOTP_SECRET": "totp",
+        "DHAN_PIN": "1234",
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_ANON_KEY": "anon",
+        "SUPABASE_SERVICE_ROLE_KEY": "service",
+    }.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
+    sys.modules.pop("src.config.settings", None)
 
-    monkeypatch.setattr(settings, "TELEGRAM_WEBHOOK_SECRET", "")
-    with pytest.raises(ValueError, match="TELEGRAM_WEBHOOK_SECRET"):
-        settings.require("TELEGRAM_WEBHOOK_SECRET")
+    with pytest.raises(RuntimeError, match="TELEGRAM_WEBHOOK_SECRET"):
+        importlib.import_module("src.config.settings")
 
     monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "test-webhook-secret")
     sys.modules.pop("src.config.settings", None)
