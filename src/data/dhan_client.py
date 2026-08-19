@@ -366,8 +366,8 @@ def generate_access_token(
     try:
         response = active_client.post(
             DHAN_AUTH_API,
-            headers={"Accept": "application/json"},
-            params={
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            json={
                 "dhanClientId": settings.DHAN_CLIENT_ID,
                 "pin": pin,
                 "totp": totp,
