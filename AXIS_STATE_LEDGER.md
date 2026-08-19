@@ -97,10 +97,10 @@ migration live in Supabase — all 7 tables, Section 3.3)
 - D-018: 🟢 DONE
 - D-010: 🟢 DONE
 - D-051: 🟢 DONE
-- D-055: 🟢 DONE
-- D-004: 🟢 DONE
-- D-048: 🟢 DONE
-- D-005: 🟢 DONE
+- D-055: 🔴 TODO
+- D-004: 🔴 TODO
+- D-048: 🔴 TODO
+- D-005: 🔴 TODO
 - D-009: 🟢 DONE
 - D-008: 🟢 DONE
 - D-049: 🟢 DONE
